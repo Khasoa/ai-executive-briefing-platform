@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge"
 import { opportunities } from "@/data/mock"
 import { formatCurrency } from "@/lib/utils"
 import { cn } from "@/lib/utils"
+import { pageHeader, ease } from "@/lib/motion"
 
 const stageColors: Record<string, string> = {
-  Negotiation: "bg-amber-50 text-amber-700",
-  Qualified: "bg-blue-50 text-blue-700",
-  Proposal: "bg-indigo-50 text-indigo-700",
-  Discovery: "bg-violet-50 text-violet-700",
-  "Closed Won": "bg-emerald-50 text-emerald-700",
+  Negotiation: "bg-gold/12 text-[#8a7340]",
+  Qualified: "bg-info/10 text-info",
+  Proposal: "bg-lavender/12 text-[#7a6e85]",
+  Discovery: "bg-coral/10 text-coral",
+  "Closed Won": "bg-sage/12 text-sage",
 }
 
 export function CRMPage() {
@@ -20,19 +21,15 @@ export function CRMPage() {
     .reduce((sum, o) => sum + o.value, 0)
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">CRM Pipeline</h1>
+    <div className="mx-auto max-w-7xl px-8 py-10 lg:px-12">
+      <motion.div {...pageHeader} className="mb-10">
+        <div className="flex items-center gap-2.5">
+          <Users className="h-5 w-5 text-coral" strokeWidth={1.75} />
+          <h1 className="text-3xl font-semibold tracking-tight lg:text-[2rem]">CRM Pipeline</h1>
         </div>
-        <div className="mt-2 flex items-center gap-4">
+        <div className="mt-3 flex flex-wrap items-center gap-5">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <TrendingUp className="h-4 w-4" />
+            <TrendingUp className="h-4 w-4 text-sage" strokeWidth={1.75} />
             <span className="text-sm">
               Active pipeline: <strong className="text-foreground">{formatCurrency(totalPipeline)}</strong>
             </span>
@@ -49,42 +46,42 @@ export function CRMPage() {
             key={opp.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
+            transition={{ delay: i * 0.06, duration: 0.45, ease }}
           >
-            <Card className="group h-full transition-all duration-300 hover:card-shadow-hover">
-              <CardContent className="flex h-full flex-col p-5">
-                <div className="mb-4 flex items-start justify-between">
+            <Card className="group h-full hover:card-shadow-hover">
+              <CardContent className="flex h-full flex-col p-6">
+                <div className="mb-5 flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-100 to-violet-50 text-sm font-bold text-indigo-700">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-champagne text-sm font-bold text-foreground/80">
                       {opp.logo}
                     </div>
                     <div>
-                      <h3 className="font-semibold">{opp.company}</h3>
+                      <h3 className="font-semibold tracking-tight">{opp.company}</h3>
                       <p className="text-xs text-muted-foreground">{opp.owner}</p>
                     </div>
                   </div>
                   <span
                     className={cn(
                       "rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                      stageColors[opp.stage] || "bg-gray-50 text-gray-700"
+                      stageColors[opp.stage] || "bg-muted text-muted-foreground"
                     )}
                   >
                     {opp.stage}
                   </span>
                 </div>
 
-                <div className="mb-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs text-muted-foreground">Value</p>
-                    <p className="text-lg font-semibold">{formatCurrency(opp.value)}</p>
+                <div className="mb-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-muted/50 p-4">
+                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Value</p>
+                    <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">{formatCurrency(opp.value)}</p>
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs text-muted-foreground">Probability</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-lg font-semibold">{opp.probability}%</p>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+                  <div className="rounded-xl bg-muted/50 p-4">
+                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Probability</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <p className="text-lg font-semibold tabular-nums">{opp.probability}%</p>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
                         <div
-                          className="h-full rounded-full bg-primary transition-all"
+                          className="h-full rounded-full bg-coral/70 transition-all duration-500"
                           style={{ width: `${opp.probability}%` }}
                         />
                       </div>
@@ -92,7 +89,7 @@ export function CRMPage() {
                   </div>
                 </div>
 
-                <div className="mb-3 flex flex-wrap gap-1.5">
+                <div className="mb-4 flex flex-wrap gap-1.5">
                   {opp.tags.map((tag) => (
                     <Badge key={tag} variant="outline" className="text-[10px]">
                       {tag}
@@ -100,17 +97,17 @@ export function CRMPage() {
                   ))}
                 </div>
 
-                <div className="mt-auto rounded-lg border border-indigo-100 bg-indigo-50/30 p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="h-3 w-3 text-primary" />
-                    <span className="text-[11px] font-medium text-primary">AI Deal Summary</span>
+                <div className="mt-auto rounded-xl border border-border/40 bg-champagne/30 p-4">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Sparkles className="h-3 w-3 text-coral" strokeWidth={1.75} />
+                    <span className="text-[11px] font-medium tracking-wide text-coral">Deal Summary</span>
                   </div>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {opp.aiSummary}
                   </p>
                 </div>
 
-                <p className="mt-3 text-[11px] text-muted-foreground">
+                <p className="mt-4 text-[11px] text-muted-foreground/70">
                   Last activity: {opp.lastActivity}
                 </p>
               </CardContent>

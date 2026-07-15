@@ -1,7 +1,8 @@
 import { motion } from "framer-motion"
 import { Settings, Bell, Shield, Palette, Link2, User } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { user } from "@/data/mock"
+import { pageHeader, ease } from "@/lib/motion"
 
 const settingsSections = [
   {
@@ -33,39 +34,34 @@ const settingsSections = [
 
 export function SettingsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 lg:px-10">
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Settings</h1>
+    <div className="mx-auto max-w-3xl px-8 py-10 lg:px-12">
+      <motion.div {...pageHeader} className="mb-10">
+        <div className="flex items-center gap-2.5">
+          <Settings className="h-5 w-5 text-coral" strokeWidth={1.75} />
+          <h1 className="text-3xl font-semibold tracking-tight lg:text-[2rem]">Settings</h1>
         </div>
       </motion.div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {settingsSections.map((section, i) => (
           <motion.div
             key={section.title}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * 0.05, duration: 0.45, ease }}
           >
-            <Card className="cursor-pointer transition-all duration-200 hover:card-shadow-hover">
-              <CardHeader className="pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <section.icon className="h-4 w-4 text-muted-foreground" />
+            <Card className="cursor-pointer hover:card-shadow-hover">
+              <CardHeader>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/80">
+                    <section.icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.75} />
                   </div>
                   <div>
                     <CardTitle className="text-sm">{section.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{section.description}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent />
             </Card>
           </motion.div>
         ))}

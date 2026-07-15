@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { executiveSummary } from "@/data/mock"
+import { ease } from "@/lib/motion"
 
 const urgencyColors = {
   critical: "destructive",
@@ -15,38 +16,38 @@ export function ExecutiveSummaryCard() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.1 }}
+      transition={{ duration: 0.55, delay: 0.08, ease }}
     >
-      <Card className="overflow-hidden border-indigo-100 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50">
-        <CardContent className="p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <Sparkles className="h-4 w-4 text-primary" />
+      <Card className="overflow-hidden border-peach/40 bg-gradient-to-br from-peach/30 via-card to-champagne/20">
+        <CardContent className="p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral/10">
+              <Sparkles className="h-4 w-4 text-coral" strokeWidth={1.75} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">AI Executive Summary</h3>
+              <h3 className="text-[15px] font-semibold tracking-tight">Executive Summary</h3>
               <p className="text-xs text-muted-foreground">Generated at {executiveSummary.generatedAt}</p>
             </div>
           </div>
-          <p className="mb-5 text-[15px] leading-relaxed text-foreground/90">
+          <p className="mb-6 max-w-4xl text-[15px] leading-[1.7] text-foreground/85 text-balance">
             {executiveSummary.summary}
           </p>
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-2.5">
+            <p className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
               Top Priorities
             </p>
             {executiveSummary.priorities.map((priority, i) => (
               <motion.div
                 key={priority.id}
-                initial={{ opacity: 0, x: -8 }}
+                initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 + i * 0.05 }}
-                className="flex items-center gap-3 rounded-lg bg-white/60 px-3 py-2.5 transition-colors hover:bg-white/90"
+                transition={{ delay: 0.2 + i * 0.06, duration: 0.45, ease }}
+                className="flex items-center gap-3 rounded-xl border border-border/40 bg-card/70 px-4 py-3 transition-all duration-300 hover:border-border hover:bg-card hover:shadow-sm"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-champagne text-xs font-semibold text-foreground/70">
                   {i + 1}
                 </span>
-                <span className="flex-1 text-sm">{priority.text}</span>
+                <span className="flex-1 text-sm leading-snug">{priority.text}</span>
                 <Badge variant={urgencyColors[priority.urgency as keyof typeof urgencyColors]}>
                   {priority.urgency}
                 </Badge>

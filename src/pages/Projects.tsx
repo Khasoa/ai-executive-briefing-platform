@@ -4,20 +4,17 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { projects } from "@/data/mock"
 import { cn } from "@/lib/utils"
+import { pageHeader, ease } from "@/lib/motion"
 
 export function ProjectsPage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 lg:px-10">
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <div className="flex items-center gap-2">
-          <FolderKanban className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Projects</h1>
+    <div className="mx-auto max-w-5xl px-8 py-10 lg:px-12">
+      <motion.div {...pageHeader} className="mb-10">
+        <div className="flex items-center gap-2.5">
+          <FolderKanban className="h-5 w-5 text-coral" strokeWidth={1.75} />
+          <h1 className="text-3xl font-semibold tracking-tight lg:text-[2rem]">Projects</h1>
         </div>
-        <p className="mt-1 text-muted-foreground">7 active initiatives across the company</p>
+        <p className="mt-2 text-muted-foreground">7 active initiatives across the company</p>
       </motion.div>
 
       <div className="space-y-3">
@@ -26,12 +23,12 @@ export function ProjectsPage() {
             key={project.id}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * 0.05, duration: 0.45, ease }}
           >
-            <Card className="transition-all duration-200 hover:card-shadow-hover">
-              <CardContent className="flex items-center gap-5 p-5">
+            <Card className="hover:card-shadow-hover">
+              <CardContent className="flex items-center gap-6 p-6">
                 <div className="flex-1 min-w-0">
-                  <div className="mb-1 flex items-center gap-2">
+                  <div className="mb-1.5 flex items-center gap-2">
                     <h3 className="font-medium">{project.name}</h3>
                     <Badge
                       variant={project.status === "At Risk" ? "warning" : "success"}
@@ -45,18 +42,20 @@ export function ProjectsPage() {
                     {project.owner} · Due {project.dueDate}
                   </p>
                 </div>
-                <div className="w-32 shrink-0">
-                  <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                <div className="w-36 shrink-0">
+                  <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
                     <span>Progress</span>
-                    <span>{project.progress}%</span>
+                    <span className="tabular-nums">{project.progress}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${project.progress}%` }}
+                      transition={{ duration: 0.8, delay: 0.2 + i * 0.05, ease: [0.25, 0.1, 0.25, 1] }}
                       className={cn(
-                        "h-full rounded-full transition-all",
-                        project.status === "At Risk" ? "bg-amber-500" : "bg-primary"
+                        "h-full rounded-full",
+                        project.status === "At Risk" ? "bg-gold/80" : "bg-coral/70"
                       )}
-                      style={{ width: `${project.progress}%` }}
                     />
                   </div>
                 </div>

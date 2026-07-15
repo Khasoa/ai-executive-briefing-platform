@@ -3,10 +3,11 @@ import { Clock, Video, MapPin, Phone } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { meetings } from "@/data/mock"
+import { ease } from "@/lib/motion"
 
 const typeColors = {
   internal: "secondary",
-  client: "purple",
+  client: "coral",
   investor: "success",
 } as const
 
@@ -21,8 +22,10 @@ export function MeetingsTimeline() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-blue-500" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+            <Clock className="h-4 w-4 text-info" strokeWidth={1.75} />
+          </div>
           <CardTitle>Upcoming Meetings</CardTitle>
         </div>
       </CardHeader>
@@ -33,31 +36,31 @@ export function MeetingsTimeline() {
             return (
               <motion.div
                 key={meeting.id}
-                initial={{ opacity: 0, x: -8 }}
+                initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.06 }}
-                className="relative flex gap-4 pb-6 last:pb-0"
+                transition={{ delay: 0.22 + i * 0.06, duration: 0.45, ease }}
+                className="relative flex gap-4 pb-7 last:pb-0"
               >
                 {i < meetings.length - 1 && (
-                  <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
+                  <div className="absolute left-[15px] top-9 h-[calc(100%-12px)] w-px bg-border/80" />
                 )}
-                <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-background bg-accent">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
+                <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card">
+                  <div className="h-2 w-2 rounded-full bg-coral/70" />
                 </div>
                 <div className="flex-1 pt-0.5">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="text-xs font-medium text-primary">{meeting.time}</span>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-coral">{meeting.time}</span>
                     <span className="text-xs text-muted-foreground">{meeting.duration}</span>
                     <Badge variant={typeColors[meeting.type as keyof typeof typeColors]} className="text-[10px]">
                       {meeting.type}
                     </Badge>
                   </div>
-                  <h4 className="text-sm font-medium">{meeting.title}</h4>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <h4 className="text-sm font-medium leading-snug">{meeting.title}</h4>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {meeting.attendees.join(", ")}
                   </p>
-                  <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-                    <LocationIcon className="h-3 w-3" />
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground/80">
+                    <LocationIcon className="h-3 w-3" strokeWidth={1.75} />
                     {meeting.location}
                   </div>
                 </div>

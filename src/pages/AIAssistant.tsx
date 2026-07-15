@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { chatSuggestions, chatHistory as initialHistory } from "@/data/mock"
 import { cn } from "@/lib/utils"
+import { ease } from "@/lib/motion"
 
 interface Message {
   id: string
@@ -61,13 +62,13 @@ export function AIAssistantPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
+      <div className="border-b border-border/50 px-8 py-5 glass">
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral/10">
+            <Sparkles className="h-4 w-4 text-coral" strokeWidth={1.75} />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">AI Assistant</h1>
+            <h1 className="text-base font-semibold tracking-tight">AI Assistant</h1>
             <p className="text-xs text-muted-foreground">
               Connected to email, calendar, CRM & projects
             </p>
@@ -75,33 +76,34 @@ export function AIAssistantPage() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-8">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.map((msg) => (
             <motion.div
               key={msg.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease }}
               className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
             >
               {msg.role === "assistant" && (
-                <div className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                <div className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-coral/10">
+                  <Sparkles className="h-4 w-4 text-coral" strokeWidth={1.75} />
                 </div>
               )}
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                  "max-w-[85%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed",
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-card border border-border card-shadow"
+                    : "bg-card border border-border/60 card-shadow"
                 )}
               >
                 {msg.content.split("\n").map((line, i) => (
-                  <p key={i} className={i > 0 ? "mt-2" : ""}>
+                  <p key={i} className={i > 0 ? "mt-2.5" : ""}>
                     {line.split(/(\*\*[^*]+\*\*)/).map((part, j) =>
                       part.startsWith("**") && part.endsWith("**") ? (
-                        <strong key={j}>{part.slice(2, -2)}</strong>
+                        <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
                       ) : (
                         <span key={j}>{part}</span>
                       )
@@ -113,25 +115,30 @@ export function AIAssistantPage() {
           ))}
 
           {isTyping && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Sparkles className="h-4 w-4 text-primary" />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, ease }}
+              className="flex items-center gap-3"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-coral/10">
+                <Sparkles className="h-4 w-4 text-coral" strokeWidth={1.75} />
               </div>
-              <div className="flex gap-1 rounded-2xl border border-border bg-card px-4 py-3">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:0ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:150ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:300ms]" />
+              <div className="flex gap-1.5 rounded-2xl border border-border/50 bg-card px-5 py-4">
+                <span className="typing-dot h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                <span className="typing-dot h-1.5 w-1.5 rounded-full bg-muted-foreground [animation-delay:200ms]" />
+                <span className="typing-dot h-1.5 w-1.5 rounded-full bg-muted-foreground [animation-delay:400ms]" />
               </div>
             </motion.div>
           )}
 
           {messages.length <= 1 && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {chatSuggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => sendMessage(suggestion)}
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-muted-foreground transition-all duration-200 hover:border-primary/30 hover:bg-accent/30 hover:text-foreground cursor-pointer"
+                  className="rounded-xl border border-border/60 bg-card px-5 py-3.5 text-left text-sm text-muted-foreground transition-all duration-300 hover:border-coral/20 hover:bg-accent/50 hover:text-foreground hover:shadow-sm cursor-pointer"
                 >
                   {suggestion}
                 </button>
@@ -141,28 +148,29 @@ export function AIAssistantPage() {
         </div>
       </div>
 
-      <div className="border-t border-border px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-2">
+      <div className="border-t border-border/50 px-8 py-5 glass">
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5">
           <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground">
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="h-4 w-4" strokeWidth={1.75} />
           </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
             placeholder="Ask Atlas anything about your business..."
-            className="flex-1 rounded-xl"
+            className="flex-1"
           />
           <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground">
-            <Mic className="h-4 w-4" />
+            <Mic className="h-4 w-4" strokeWidth={1.75} />
           </Button>
           <Button
+            variant="coral"
             size="icon"
-            className="shrink-0 rounded-xl"
+            className="shrink-0"
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-4 w-4" strokeWidth={1.75} />
           </Button>
         </div>
       </div>

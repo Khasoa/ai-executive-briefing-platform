@@ -1,42 +1,78 @@
-# Atlas – AI Executive Partner
+# Relay — AI Executive Partner
 
-A premium SaaS dashboard for founders and executives. Atlas aggregates email, calendar, CRM, projects, and research into an AI-powered executive command center.
+Relay is an AI-powered executive workspace that helps founders and executives manage their business from one place. It combines AI, automation, business intelligence, and operational support into a single command center.
+
+## Repository Structure
+
+```
+ai-executive-partner/
+├── src/                  # React frontend (Vite + TypeScript)
+├── backend/              # FastAPI backend
+├── docs/                 # Architecture and API documentation
+├── automation/         # Workflow automations (future)
+├── assets/               # Screenshots and demo assets
+└── README.md
+```
 
 ## Tech Stack
 
-- **React 19** + **TypeScript** + **Vite**
-- **Tailwind CSS v4** for styling
-- **shadcn/ui** component patterns
-- **Framer Motion** for animations
-- **Lucide React** for icons
-- **React Router** for navigation
+### Frontend
+- React 19, TypeScript, Vite
+- Tailwind CSS, shadcn/ui, Framer Motion
 
-## Getting Started
+### Backend
+- Python 3.12, FastAPI, SQLAlchemy 2.0
+- Alembic, PostgreSQL, Pydantic v2
+
+## Quick Start
+
+### Frontend
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173](http://localhost:5173).
 
-## Pages
-
-| Page | Description |
-|------|-------------|
-| **Overview** | Personalized greeting, AI executive summary, KPIs, recommendations, meetings, activity |
-| **Daily Brief** | Full AI-generated briefing with priorities, meetings, pipeline, deadlines, risks |
-| **Inbox** | AI-classified emails with executive summaries |
-| **Calendar** | Today's meeting schedule |
-| **CRM** | Deal pipeline as modern cards with AI deal summaries |
-| **Projects** | Active initiatives with progress tracking |
-| **Research** | AI-curated business intelligence |
-| **AI Assistant** | ChatGPT-style interface connected to business tools |
-| **Settings** | Profile, notifications, integrations |
-
-## Build
+### Backend
 
 ```bash
-npm run build
-npm run preview
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Connect Frontend to Backend
+
+Set in the frontend `.env`:
+
+```
+VITE_API_URL=http://localhost:8000
+```
+
+Then replace direct `@/data/mock` imports with API calls.
+
+## Health Check
+
+```bash
+curl http://localhost:8000/health
+# {"status":"healthy"}
+```
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [API Reference](docs/api.md)
+- [Roadmap](docs/roadmap.md)
+- [Decisions](docs/decisions.md)
+- [Backend README](backend/README.md)
+
+## License
+
+See [LICENSE](LICENSE).
