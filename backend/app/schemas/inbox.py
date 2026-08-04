@@ -2,38 +2,53 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+EmailCategory = Literal[
+    "needs-reply",
+    "high-priority",
+    "waiting",
+    "delegated",
+    "informational",
+]
+
+
+class SenderSchema(BaseModel):
+    name: str
+    email: str
+    company: str
+    avatar: str
+
 
 class EmailSchema(BaseModel):
     id: str
-    from_: str
+    category: EmailCategory
     subject: str
-    summary: str
-    time: str
+    sender: SenderSchema
+    timeLabel: str
+    receivedAt: str
+    aiSummary: str
+    priority: Literal["critical", "high", "medium", "low"]
+    suggestedResponse: str
+    readingTime: str
+    threadCount: int
     unread: bool
-    actionRequired: bool | None = None
-
-    model_config = {"populate_by_name": True}
-
-    # Frontend expects "from" field; alias handles Python reserved keyword
-    @classmethod
-    def from_mock(cls, data: dict) -> "EmailSchema":
-        return cls(
-            id=data["id"],
-            from_=data["from"],
-            subject=data["subject"],
-            summary=data["summary"],
-            time=data["time"],
-            unread=data["unread"],
-            actionRequired=data.get("actionRequired"),
-        )
+    labels: list[str]
 
 
 class InboxCategorySchema(BaseModel):
-    id: Literal["urgent", "clients", "investors", "finance", "internal", "newsletters"]
+    id: EmailCategory
     label: str
+    description: str
     count: int
-    emails: list[dict]
+
+
+class InboxSummarySchema(BaseModel):
+    headline: str
+    totalUnread: int
+    estimatedClearTime: str
+    handledAutomatically: int
 
 
 class InboxResponse(BaseModel):
+    summary: InboxSummarySchema
     categories: list[InboxCategorySchema]
+    emails: list[EmailSchema]

@@ -9,5 +9,5 @@ router = APIRouter(prefix="/crm", tags=["crm"])
 
 
 @router.get("", response_model=CRMResponse)
-def get_crm(db: Session = Depends(get_db)) -> CRMResponse:
-    return CRMService(db).get_crm()
+def get_pipeline(db: Session = Depends(get_db)) -> CRMResponse:
+    return CRMService(db).get_pipeline()

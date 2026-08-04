@@ -1,1 +1,1 @@
-"""Relay AI Executive Partner — FastAPI backend."""
+"""Briefly — AI Executive Briefing Platform. FastAPI backend."""

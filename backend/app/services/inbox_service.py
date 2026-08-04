@@ -5,11 +5,24 @@ from app.services import mock_data
 
 
 class InboxService:
-    """Provides AI-classified inbox data."""
+    """Turns raw threads into categorised, summarised executive mail."""
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_inbox(self) -> InboxResponse:
-        # Future: integrate with Gmail via integrations/gmail.py
-        return InboxResponse(categories=mock_data.INBOX_CATEGORIES)
+        return InboxResponse(
+            summary=mock_data.INBOX_SUMMARY,
+            categories=self._categories(),
+            emails=mock_data.EMAILS,
+        )
+
+    @staticmethod
+    def _categories() -> list[dict]:
+        return [
+            {
+                **category,
+                "count": sum(1 for email in mock_data.EMAILS if email["category"] == category["id"]),
+            }
+            for category in mock_data.INBOX_CATEGORIES
+        ]

@@ -1,213 +1,175 @@
 # Architectural Decisions
 
-This document records the key architectural decisions made for Relay's backend and the reasoning behind each choice.
+Key decisions behind Briefly and the reasoning for each.
 
 ---
 
-## ADR-001: FastAPI as the Web Framework
+## ADR-001: The Morning Brief is the product
 
-**Decision:** Use FastAPI for the backend API.
+**Decision:** One page is the output; every other page supports it.
 
 **Why:**
-- Native async support for future I/O-bound integrations (Gmail, Calendar APIs)
-- Automatic OpenAPI documentation at `/docs`
-- Pydantic v2 integration for request/response validation
-- Dependency injection system maps cleanly to our service layer
-- Large ecosystem and strong Railway deployment support
+- An executive tool that does eight things well is still eight things to check every morning
+- A single artefact can be read in five minutes, printed, or forwarded to a chief of staff
+- It gives every feature a test: does this make tomorrow's brief better?
 
-**Alternatives considered:** Django REST Framework (heavier, more opinionated), Flask (no built-in validation or DI).
+**Consequence:** Pages that did not serve the brief — Projects, Research, Calendar grid, generic AI chat — were removed rather than redesigned.
 
 ---
 
-## ADR-002: Modular Monolith over Microservices
+## ADR-002: Recommend, never act
 
-**Decision:** Single FastAPI application with internal module boundaries.
+**Decision:** No endpoint sends email, moves a deal or accepts a meeting. Integration scopes are read-only.
 
 **Why:**
-- v0.1 is a small team building an MVP — microservices add operational overhead without benefit
-- Clear folder structure (`routes/`, `services/`, `integrations/`) provides separation of concerns
-- Can extract services into independent deployments later if needed
-- Simpler Railway deployment (one service, one database)
+- Trust is the binding constraint for an AI product with access to a founder's inbox and pipeline
+- A wrong summary costs a minute; a wrong send costs a relationship
+- Draft-and-approve is a useful workflow on its own
 
-**Alternatives considered:** Microservices from day one (premature), serverless functions (cold start issues, harder local dev).
+**How it shows up:** `suggestedResponse` on every email, a "Draft — not sent" label on generated text, and `autoApproveActions` in settings that exists only to be permanently disabled.
 
 ---
 
-## ADR-003: Service Layer Pattern
+## ADR-003: Cite every AI statement
 
-**Decision:** Routes delegate to service classes. No business logic in route handlers.
+**Decision:** Recommendations, risks and Ask Briefly reports name the systems they came from.
 
 **Why:**
-- Services can be tested independently of HTTP layer
-- Mock data and real integrations swap without changing routes
-- Each domain (inbox, CRM, calendar) has a clear owner
-- Matches how the frontend thinks about features (one service per page)
+- An executive cannot act on a claim they cannot verify
+- Citations expose the failure mode where the model is confident about a system it never read
+- Once generation is retrieval-backed, citations fall out of which records were retrieved
 
-**Example:**
+**Implementation:** `Source` and `CitationSchema` in `schemas/common.py`; `SourceChip` renders them identically everywhere.
+
+---
+
+## ADR-004: One urgency vocabulary
+
+**Decision:** `critical`, `high`, `medium`, `low` across every domain — email priority, risk severity, deal risk, recommendation priority.
+
+**Why:**
+- Three different colour schemes for "urgent" teaches the reader nothing and slows scanning
+- Lists can be sorted by consequence with one shared comparator
+- The API enforces it via a shared `Literal`, so the UI never encounters an unmapped value
+
+**Implementation:** `schemas/common.py` on the backend, `lib/signals.js` on the frontend.
+
+---
+
+## ADR-005: JavaScript, not TypeScript
+
+**Decision:** The frontend is plain JavaScript with JSX.
+
+**Why:**
+- Explicitly specified for this product
+- Pydantic already defines and validates the API contract at the boundary that matters
+- `jsconfig.json` preserves path aliases and editor intelligence
+
+**Trade-off:** No compile-time guarantee that a component matches an API response. Mitigated by keeping every fetch in `services/briefly.js` and rendering directly from responses, and by a smoke test that mounts each page against the live API.
+
+---
+
+## ADR-006: Pages hold no local copy of server data
+
+**Decision:** Each page runs one `useApiQuery`. Mutations return the updated object and the page applies it via `setData`.
+
+**Why:**
+- Two copies of the truth drift; one does not
+- Optimistic local state would have to replicate server rules (checklist progress, pipeline weighting)
+- Keeps pages small enough to read in one screen
+
+---
+
+## ADR-007: Thin routes, fat services
+
+**Decision:** Routes receive, inject the session, delegate and return. All logic lives in service classes.
+
+**Why:**
+- Services are testable without HTTP
+- Swapping curated data for a database query or an integration touches one class
+- Each domain has one obvious owner
+
 ```python
-# Route (thin)
-@router.get("/inbox")
-def get_inbox(db: Session = Depends(get_db)):
-    return InboxService(db).get_inbox()
-
-# Service (business logic)
-class InboxService:
-    def get_inbox(self):
-        # v0.1: return mock data
-        # v0.3: query Email table + Gmail sync
+@router.get("", response_model=CRMResponse)
+def get_pipeline(db: Session = Depends(get_db)) -> CRMResponse:
+    return CRMService(db).get_pipeline()
 ```
 
 ---
 
-## ADR-004: Mock Data in v0.1
+## ADR-008: Curated data behind real service boundaries
 
-**Decision:** Services return mock data from a centralized `mock_data.py` module. Database models exist but are not yet populated by API calls.
+**Decision:** Services read from `mock_data.py`, but only through the same methods that will later query the database.
 
 **Why:**
-- Frontend can connect to the backend immediately without waiting for integrations
-- Mock data exactly matches the frontend's existing data shapes
-- Database schema is ready for when integrations arrive
-- Avoids building a complex seeding system before it's needed
+- The frontend can be built and demonstrated end to end immediately
+- Response shapes are proven against a real UI before an integration is written
+- Computed values (weighted pipeline, prep counts, scheduled minutes) are calculated, not hardcoded, so they stay correct when the source changes
 
-**Trade-off:** API responses don't persist or reflect database state yet. Acceptable for v0.1.
+**Trade-off:** Mutations live in process memory and reset on restart. Acceptable while there is no persistence layer wired up.
 
 ---
 
-## ADR-005: SQLAlchemy 2.0 with Typed Models
+## ADR-009: Schemas separate from ORM models
 
-**Decision:** Use SQLAlchemy 2.0 declarative style with `Mapped` type annotations.
+**Decision:** `app/schemas/` defines the API contract; `app/models/` defines storage.
 
 **Why:**
-- Modern Python typing support (mypy-compatible)
-- `mapped_column` is the current recommended pattern
-- JSONB and ARRAY types for flexible fields (brief sections, tags, integration config)
-- Alembic integration for migration management
-
-**Alternatives considered:** Raw SQL (no ORM benefits), SQLModel (less mature ecosystem).
+- The frontend wants camelCase and flattened, composed objects; the database wants snake_case and normalised rows
+- A response often spans several tables (a brief pulls from meetings, emails and opportunities)
+- Prevents internal columns from leaking into the API
 
 ---
 
-## ADR-006: PostgreSQL on Railway
+## ADR-010: Integration modules, never direct SDK calls
 
-**Decision:** PostgreSQL as the primary database, hosted on Railway.
+**Decision:** Each provider gets a module in `app/integrations/` exposing a consistent internal interface.
 
 **Why:**
-- JSONB support for flexible schema fields (daily brief sections, integration config)
-- ARRAY type for tags and attendees
-- Railway provides managed PostgreSQL with automatic `DATABASE_URL`
-- Production-grade reliability for a SaaS product
-- Strong SQLAlchemy and Alembic support
-
-**Alternatives considered:** SQLite (not suitable for production SaaS), MongoDB (relational data fits better in SQL).
+- A Gmail API change touches one file
+- Integrations can be stubbed in tests
+- Services stay readable — they express business rules, not HTTP plumbing
 
 ---
 
-## ADR-007: Integration Module Pattern
+## ADR-011: Tailwind v4 theme tokens over a config file
 
-**Decision:** Each external service gets a dedicated module in `app/integrations/`. Services never call third-party APIs directly.
+**Decision:** Design tokens are CSS custom properties in `@theme` inside `src/index.css`.
 
 **Why:**
-- Isolates API changes — if Gmail's API changes, only `gmail.py` needs updating
-- Consistent internal interface regardless of provider
-- Easy to mock integrations in tests
-- Clear ownership for each integration
-
-**Structure:**
-```
-integrations/gmail.py       → used by InboxService
-integrations/google_calendar.py → used by CalendarService
-integrations/gohighlevel.py → used by CRMService
-integrations/openai.py        → used by AssistantService, OverviewService
-```
+- Tailwind v4's native approach; no `tailwind.config.js` to keep in sync
+- Tokens are inspectable in the browser and reusable in plain CSS (print styles, scrollbars)
+- Renaming a colour is one edit, and every utility follows
 
 ---
 
-## ADR-008: Pydantic Schemas Separate from ORM Models
+## ADR-012: The brief is a document, not a dashboard
 
-**Decision:** API response shapes are defined in `app/schemas/`, separate from `app/models/`.
+**Decision:** The Morning Brief uses numbered sections, a serif face for prose, and a print stylesheet.
 
 **Why:**
-- API contract is independent of database schema
-- Frontend field names (camelCase like `executiveSummary`) differ from database columns (snake_case)
-- Response schemas can combine data from multiple models
-- Prevents accidental exposure of internal database fields
+- Executives read reports; they scan dashboards. The brief is meant to be read
+- Printing and presenting are real behaviours for a document that summarises a business day
+- Visual separation from the rest of the app signals that this page is the output
 
 ---
 
-## ADR-009: No Authentication in v0.1
+## ADR-013: Flat routes, no `/api` prefix
 
-**Decision:** Skip authentication for the initial release. User model includes `email` for future auth.
+**Decision:** `/overview`, `/inbox`, `/morning-brief` at the root; health at `/health`.
 
 **Why:**
-- Single-user demo doesn't require auth complexity
-- User model is already designed for multi-tenant auth later
-- Avoids blocking frontend integration on auth flows
-- JWT auth planned for v1.0
-
-**Risk:** API is open in v0.1. Mitigated by deploying only in development/staging.
+- Frontend and backend deploy separately, so there is no path collision to avoid
+- Simpler client code
+- A `/v1` prefix can be added when there is a second version to serve
 
 ---
 
-## ADR-010: Centralized Settings via pydantic-settings
+## ADR-014: Configuration through pydantic-settings
 
-**Decision:** All configuration loaded from environment variables through a `Settings` class.
-
-**Why:**
-- Railway injects config via environment variables
-- `.env` file for local development
-- Type-safe settings with defaults
-- Single source of truth for database URL, CORS origins, log level
-
----
-
-## ADR-011: Alembic for Database Migrations
-
-**Decision:** Use Alembic for all schema changes.
+**Decision:** All configuration loads from environment variables into a cached `Settings` object.
 
 **Why:**
-- Industry standard for SQLAlchemy projects
-- Version-controlled migration history
-- `upgrade`/`downgrade` support for rollbacks
-- Railway deploy hooks can run `alembic upgrade head`
-
----
-
-## ADR-012: Request Logging Middleware
-
-**Decision:** Custom middleware logs method, path, status code, and duration for every request.
-
-**Why:**
-- Essential for debugging in development
-- Foundation for production monitoring
-- Lightweight — no external dependencies (Datadog, etc.) needed yet
-- Structured log format for future log aggregation
-
----
-
-## ADR-013: CORS Configured via Environment
-
-**Decision:** CORS allowed origins are configurable via `CORS_ORIGINS` environment variable.
-
-**Why:**
-- Development: `http://localhost:5173` (Vite dev server)
-- Production: actual frontend domain
-- Comma-separated string parsed into list
-- No code changes needed between environments
-
----
-
-## ADR-014: Flat Route Structure
-
-**Decision:** Top-level routes (`/overview`, `/calendar`, `/inbox`) without an `/api` prefix.
-
-**Why:**
-- Matches the user's specified endpoint structure
-- Simpler for frontend consumption
-- Can add `/api/v1` prefix later if versioning is needed
-- Health check at `/health` is a common convention
-
----
-
-## Summary
-
-These decisions prioritize **simplicity, modularity, and progressive enhancement**. The backend starts as a mock-data API with a production-ready schema and service architecture, then gains real integrations one at a time without structural changes.
+- Railway injects configuration as environment variables
+- Type-safe with sensible defaults for local development
+- One source of truth for database URL, CORS origins and log level

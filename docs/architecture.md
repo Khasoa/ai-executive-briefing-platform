@@ -1,161 +1,126 @@
-# Relay Architecture
+# Briefly Architecture
 
 ## Overview
 
-Relay is a full-stack SaaS application that gives executives a single AI-powered workspace for email, calendar, CRM, projects, research, and daily briefings. The system is designed as a modular monolith: one deployable backend with clear internal boundaries that can evolve into microservices if needed.
+Briefly reads an executive's connected systems and produces one thing: the Morning Brief. Every other surface — Overview, Inbox, Meetings, CRM, Ask Briefly — is a different view onto the same underlying intelligence.
+
+The system is a modular monolith: one React frontend, one FastAPI backend with clear internal boundaries, one database.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Frontend (Vite)                    │
-│  Overview · Daily Brief · Inbox · Calendar · CRM · etc.   │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ REST API (JSON)
-┌──────────────────────────▼──────────────────────────────────┐
-│                    FastAPI Backend                           │
-│  ┌─────────┐  ┌──────────┐  ┌────────────┐  ┌──────────┐ │
-│  │ Routes  │→ │ Services │→ │ Mock Data  │  │ Database │ │
-│  └─────────┘  └──────────┘  └────────────┘  └──────────┘ │
-│                     ↓ (future)                               │
-│              ┌──────────────┐                                │
-│              │ Integrations │                                │
-│              └──────────────┘                                │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼
-   PostgreSQL         External APIs       Make.com
-   (Railway)         (Gmail, GHL, etc.)  (Orchestration)
+┌──────────────────────────────────────────────────────────────┐
+│                  React Frontend (Vite + JS)                  │
+│  Overview · Morning Brief · Inbox · Meetings · CRM ·         │
+│  Ask Briefly · Integrations · Settings                       │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ REST (JSON, camelCase)
+┌───────────────────────────▼──────────────────────────────────┐
+│                       FastAPI Backend                        │
+│   Routes ──▶ Services ──▶ Curated data / Database            │
+│                   │                                          │
+│                   └──▶ Integrations (read-only)              │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+       ┌────────────────────┼─────────────────────┐
+       ▼                    ▼                     ▼
+  PostgreSQL         Google · Notion ·          OpenAI
+                     GoHighLevel                (generation)
+                            ▲
+                            └── n8n (scheduled generation)
 ```
 
-## Layer Responsibilities
+## Frontend
 
-### API Layer (`app/api/routes/`)
+### Layer responsibilities
 
-Thin HTTP handlers. Each route:
-1. Receives the request
-2. Injects dependencies (database session)
-3. Delegates to a service class
-4. Returns a Pydantic-validated response
+| Layer | Responsibility |
+|-------|---------------|
+| `services/client.js` | One `fetch` wrapper: base URL, JSON, abort signals, `ApiError` |
+| `services/briefly.js` | One named function per endpoint. Nothing else builds a URL |
+| `hooks/useApiQuery.js` | Fetch, loading, error, refetch and abort for a page |
+| `hooks/useAsyncAction.js` | One-off mutations with pending and error state |
+| `pages/` | Compose cards from an API response. No data of their own |
+| `components/cards/` | Domain cards — the actual product surface |
+| `components/ui/` | Unstyled-by-domain primitives (button, card, badge, tabs…) |
+| `lib/signals.js` | Shared urgency vocabulary so severity looks the same everywhere |
 
-No business logic lives in routes.
+### Why pages hold no data
 
-### Service Layer (`app/services/`)
+Each page calls exactly one `useApiQuery`, then renders. Mutations (`regenerate`, checklist toggle, integration sync, preference change) return the updated object and the page applies it with `setData`. There is no client-side duplicate of server state to fall out of sync.
 
-Owns all business logic. Each domain has a dedicated service:
+The application shell fetches `/workspace` once for identity, brief freshness and navigation counts, so no page re-fetches the user.
+
+### Design system
+
+Tokens live in `src/index.css` under Tailwind v4's `@theme`. Off-white background, white cards, deep emerald primary, warm amber accent, slate text, tight radii and low-contrast borders. Motion is limited to short opacity/translate entrances and one accordion.
+
+The Morning Brief adds a serif face for long-form passages and a print stylesheet, because it is meant to be read, presented or exported rather than scanned.
+
+## Backend
+
+### Layer responsibilities
+
+**Routes** (`app/api/routes/`) are thin: receive, inject the session, delegate, return a validated response. No business logic.
+
+**Services** (`app/services/`) own everything else:
 
 | Service | Domain |
 |---------|--------|
-| `OverviewService` | Executive dashboard, daily brief |
-| `CalendarService` | Meetings and schedule |
-| `InboxService` | Email classification and summaries |
-| `CRMService` | Pipeline and deals |
-| `ProjectService` | Initiatives and tasks |
-| `ResearchService` | Business intelligence curation |
-| `AssistantService` | AI chat and suggestions |
-| `SettingsService` | User profile and integrations |
+| `WorkspaceService` | Shell identity and navigation counts |
+| `OverviewService` | Dashboard aggregation across every other domain |
+| `MorningBriefService` | Brief assembly, regeneration, checklist state |
+| `InboxService` | Thread categorisation and counts |
+| `MeetingService` | Meeting intelligence and scheduling maths |
+| `CRMService` | Pipeline filtering, weighting and exposure |
+| `AskService` | Question matching and cited report construction |
+| `IntegrationService` | Connection state and sync triggers |
+| `SettingsService` | Profile, preferences, notifications, security |
 
-In v0.1, services return mock data from `mock_data.py`. In later versions, services will query the database and call integration modules.
+Services currently read from `mock_data.py`. They will read from the database and integration modules without any change to the routes or the API contract.
 
-### Data Layer
+**Schemas** (`app/schemas/`) define the contract, separate from ORM models. `common.py` holds the shared vocabulary — urgency, severity, confidence, sources and citations — so every endpoint speaks the same language.
 
-**PostgreSQL** stores persistent state: users, emails, meetings, deals, tasks, research items, and integration credentials.
+**Models** (`app/models/`) describe the persistence target: `User`, `MorningBrief`, `BriefAction`, `Meeting`, `Email`, `Opportunity`, `Integration`, `SyncEvent`.
 
-**SQLAlchemy 2.0** provides the ORM with typed `Mapped` columns.
+### Read-only by design
 
-**Alembic** manages schema migrations.
+No endpoint sends an email, moves a deal or accepts a meeting. `POST /ask` can produce a draft; only the executive can act on it. `autoApproveActions` exists in settings purely to be permanently disabled, making the guarantee visible in the product.
 
-### Integration Layer (`app/integrations/`) — Future
+## How the integrations fit
 
-Each external service gets a dedicated integration module:
+Each provider becomes one module in `app/integrations/` exposing a consistent internal interface. Services call integrations; they never touch a third-party SDK directly.
 
 ```
 integrations/
-├── gmail.py           # Gmail API — inbox sync, send
-├── google_calendar.py # Google Calendar API — events
-├── gohighlevel.py     # GoHighLevel API — CRM pipeline
-├── openai.py          # OpenAI API — briefings, chat
-├── clickup.py         # ClickUp API — projects/tasks
-├── notion.py          # Notion API — knowledge base
-└── make.py            # Make.com webhooks — orchestration
+├── gmail.py             → InboxService, MorningBriefService
+├── google_calendar.py   → MeetingService
+├── gohighlevel.py       → CRMService
+├── notion.py            → OverviewService, MorningBriefService
+├── openai.py            → MorningBriefService, AskService
+└── n8n.py               → scheduled generation webhooks
 ```
 
-Integration modules expose a consistent internal interface. Services call integrations, never third-party APIs directly.
+**Gmail** — OAuth2 tokens on `Integration.config`; sync writes into `Email`; OpenAI fills `ai_summary`, `priority` and `suggested_response`. `InboxService` swaps its source and nothing else changes.
 
-## How Future Integrations Fit
+**Google Calendar** — events sync into `Meeting`; the generated preparation (`intelligence` JSONB) is produced once per event and reused by both the Meetings page and the brief.
 
-### Gmail (v0.3)
+**GoHighLevel** — opportunities sync into `Opportunity`; `risk_level` is derived from engagement recency, stage movement and signals found in linked threads.
 
-```
-Gmail API → integrations/gmail.py → InboxService
-```
+**Notion** — indexed pages provide the internal context (plans, metrics) that lets the brief name team blockers.
 
-- OAuth2 flow stores tokens in `Integration` model
-- Periodic sync fetches new emails into `Email` table
-- OpenAI classifies and summarizes emails into categories
-- `InboxService.get_inbox()` queries `Email` instead of mock data
+**OpenAI** — turns the synced corpus into `MorningBrief.sections` and answers Ask Briefly questions. Citations come from which records were retrieved, not from the model.
 
-### Google Calendar (v0.2)
+**n8n** — calls `POST /morning-brief/regenerate` on a schedule so the brief is ready before the executive wakes up.
+
+## Data flow: generating a brief
 
 ```
-Google Calendar API → integrations/google_calendar.py → CalendarService
+06:25  n8n triggers generation
+06:26  Integrations sync → Email, Meeting, Opportunity rows updated
+06:28  MorningBriefService retrieves today's records per domain
+06:29  OpenAI produces summary, priorities, risks, focus, delegation
+06:30  MorningBrief + BriefAction rows written, SyncEvent logged
+06:31  GET /morning-brief serves it; the shell shows "generated 2 minutes ago"
 ```
-
-- OAuth2 stores calendar access tokens
-- Sync imports events into `Meeting` table
-- `CalendarService.get_calendar()` queries today's meetings from database
-- Overview and Daily Brief services reuse the same meeting data
-
-### GoHighLevel (v0.4)
-
-```
-GoHighLevel API → integrations/gohighlevel.py → CRMService
-```
-
-- API key stored in `Integration.config`
-- Sync pulls deals/opportunities into `CRMDeal` table
-- `CRMService.get_crm()` returns live pipeline data
-- AI summaries generated via OpenAI integration
-
-### OpenAI (v0.5)
-
-```
-OpenAI API → integrations/openai.py → OverviewService, AssistantService
-```
-
-- Powers executive summary generation in `DailyBrief`
-- Generates AI recommendations on the overview dashboard
-- Replaces mock chat responses in `AssistantService`
-- Summarizes emails, deals, and research items
-
-### Make.com (v0.6)
-
-```
-Make.com → Webhooks → Backend API → Services
-```
-
-- Orchestrates multi-step workflows (e.g. "new email → classify → notify → create CRM task")
-- Triggers daily brief generation on schedule
-- Connects integrations that don't have direct API access
-- Backend exposes webhook endpoints for Make.com scenarios
-
-### ClickUp (v0.6)
-
-```
-ClickUp API → integrations/clickup.py → ProjectService
-```
-
-- Syncs tasks and projects into `Task` table
-- Progress and status pulled from ClickUp
-- `ProjectService.get_projects()` returns live project data
-
-## Authentication (Future)
-
-v0.1 has no authentication. Planned approach:
-
-- JWT-based auth with refresh tokens
-- User model already includes `email` and `is_active`
-- All service methods will accept `user_id` from the authenticated session
-- Integration tokens scoped per user
 
 ## Deployment
 
@@ -164,12 +129,13 @@ v0.1 has no authentication. Planned approach:
 | Frontend | Vercel / Netlify / Railway |
 | Backend | Railway |
 | Database | Railway PostgreSQL |
-| Automations | Make.com (future) |
+| Scheduling | n8n |
 
-## Design Principles
+## Principles
 
-1. **Thin routes, fat services** — business logic stays in services
-2. **Integration isolation** — third-party APIs wrapped in dedicated modules
-3. **Schema-first API** — Pydantic models define the contract with the frontend
-4. **Progressive enhancement** — mock data → database → live integrations
-5. **No over-engineering** — simple patterns that scale with the product
+1. **One output.** Features earn their place by improving the brief.
+2. **Thin routes, fat services.** Business logic is testable without HTTP.
+3. **Schema-first.** Pydantic defines the contract; the frontend never guesses.
+4. **Attribution everywhere.** If the AI says it, the API names the source.
+5. **Human-in-the-loop.** Read scopes only, drafts never sent.
+6. **Progressive enhancement.** Curated data → database → live integrations, without structural change.

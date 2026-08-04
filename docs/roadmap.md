@@ -1,126 +1,118 @@
-# Relay Roadmap
+# Briefly Roadmap
 
-## v0.1 — UI with Mock Backend (Current)
+## v1.0 — Briefing platform on curated data (Current)
 
-**Status:** In progress
+**Status:** Complete
 
-- [x] React frontend with all executive workspace pages
-- [x] FastAPI backend with mock data endpoints
-- [x] SQLAlchemy models and Alembic migrations
-- [x] Pydantic schemas matching frontend contracts
-- [x] Service layer architecture
-- [x] Health check endpoint
-- [x] CORS, logging, dependency injection
-- [ ] Connect frontend to backend API
-- [ ] Deploy backend to Railway
-- [ ] Seed database with demo data
+- [x] Eight-page product focused on the Morning Brief
+- [x] React frontend in JavaScript with a reusable card library
+- [x] FastAPI backend: workspace, overview, brief, inbox, meetings, CRM, ask, integrations, settings
+- [x] Shared urgency vocabulary across API and UI
+- [x] Mutations: regenerate brief, checklist state, integration sync, preferences, notifications
+- [x] Citations on every AI statement
+- [x] Print-ready Morning Brief
+- [x] Persistence schema aligned to the API contract
 
-**Goal:** End-to-end demo with the frontend consuming the real backend API (still serving mock data).
+**Goal:** A complete, demonstrable product where only the upstream data is simulated.
 
 ---
 
-## v0.2 — Google Calendar Integration
+## v1.1 — Google Calendar
 
 **Target:** Q3 2026
 
-- [ ] Google OAuth2 flow for calendar access
-- [ ] `integrations/google_calendar.py` module
-- [ ] Sync calendar events into `Meeting` table
-- [ ] `CalendarService` queries live data from database
-- [ ] Overview and Daily Brief use synced meetings
-- [ ] Meeting conflict detection and free-time analysis
+- [ ] Google OAuth2 with `calendar.readonly`
+- [ ] `integrations/google_calendar.py`
+- [ ] Event sync into `Meeting`
+- [ ] Attendee enrichment from contact history
+- [ ] Preparation status derived from real signals: reschedules, late attendees, thread silence
+- [ ] Free-time detection feeding the suggested focus blocks
 
-**Goal:** Real calendar data powering the schedule views and daily briefings.
+**Goal:** Meeting intelligence built on a real calendar.
 
 ---
 
-## v0.3 — Gmail Integration
+## v1.2 — Gmail
 
 **Target:** Q3 2026
 
-- [ ] Google OAuth2 flow for Gmail access
-- [ ] `integrations/gmail.py` module
-- [ ] Email sync into `Email` table
-- [ ] AI classification into executive categories (urgent, clients, investors, etc.)
-- [ ] Executive summaries for each email
-- [ ] `InboxService` serves live classified inbox
-- [ ] Unread count and action-required flags
+- [ ] Google OAuth2 with `gmail.readonly`
+- [ ] `integrations/gmail.py`
+- [ ] Thread sync into `Email`
+- [ ] Categorisation into needs-reply, high-priority, waiting, delegated, informational
+- [ ] Per-thread summary, priority and suggested response
+- [ ] Waiting-on detection from send/receive history
+- [ ] Reading-time estimation
 
-**Goal:** Real inbox with AI-powered executive email triage.
+**Goal:** An inbox the executive can act on without opening Gmail.
 
 ---
 
-## v0.4 — GoHighLevel Integration
+## v1.3 — OpenAI generation
 
 **Target:** Q4 2026
 
-- [ ] GoHighLevel API connection
-- [ ] `integrations/gohighlevel.py` module
-- [ ] Sync deals/opportunities into `CRMDeal` table
-- [ ] `CRMService` serves live pipeline data
-- [ ] AI deal summaries via OpenAI
-- [ ] Pipeline value calculations and stage tracking
+- [ ] `integrations/openai.py` with structured output
+- [ ] Brief assembly from synced meetings, threads and opportunities
+- [ ] Retrieval-backed citations — sources come from records, not the model
+- [ ] Ask Briefly answers generated against the same corpus
+- [ ] Confidence scoring from retrieval coverage
+- [ ] Cost and latency instrumentation per brief
 
-**Goal:** Live CRM pipeline replacing mock deal data.
+**Goal:** The brief is genuinely generated, and every claim traces to a record.
 
 ---
 
-## v0.5 — OpenAI Executive Briefing
+## v1.4 — GoHighLevel and Notion
 
 **Target:** Q4 2026
 
-- [ ] `integrations/openai.py` module
-- [ ] AI-generated daily brief from calendar, inbox, CRM, and projects
-- [ ] Executive summary on overview dashboard
-- [ ] AI recommendations based on real business context
-- [ ] Assistant chat powered by GPT with tool access
-- [ ] Email and deal summarization
+- [ ] `integrations/gohighlevel.py` — opportunity sync into `Opportunity`
+- [ ] Risk scoring from engagement recency, stage movement and thread signals
+- [ ] `integrations/notion.py` — page indexing for internal context
+- [ ] Team-blocker detection from documents awaiting approval
 
-**Goal:** Genuine AI intelligence across all workspace features.
+**Goal:** Client risk and team blockers derived from real systems.
 
 ---
 
-## v0.6 — Make.com Orchestration
+## v1.5 — n8n scheduling
 
 **Target:** Q1 2027
 
-- [ ] `integrations/make.py` webhook handlers
-- [ ] Scheduled daily brief generation workflow
-- [ ] Email → classify → notify → CRM task automation
-- [ ] ClickUp project sync (`integrations/clickup.py`)
-- [ ] Cross-service workflow triggers
-- [ ] Error handling and retry logic
+- [ ] `integrations/n8n.py` webhook handlers
+- [ ] Scheduled generation before the executive's configured delivery time
+- [ ] Delivery to email and push on completion
+- [ ] Retry and partial-source degradation (generate from three systems if the fourth is down)
+- [ ] Sync failure alerting on the Integrations page
 
-**Goal:** Automated workflows connecting all business tools without manual intervention.
+**Goal:** The brief is waiting every morning without anyone triggering it.
 
 ---
 
-## v1.0 — Production AI Executive Partner
+## v2.0 — Multi-executive production
 
 **Target:** Q2 2027
 
-- [ ] User authentication (JWT)
-- [ ] Multi-tenant support
-- [ ] Notion knowledge base integration
-- [ ] Real-time notifications
-- [ ] Mobile-responsive optimizations
-- [ ] Production monitoring and alerting
-- [ ] Rate limiting and API security
-- [ ] Billing and subscription management
-- [ ] Onboarding flow for new executives
+- [ ] JWT authentication and per-user integration tokens
+- [ ] Multi-tenant isolation
+- [ ] Brief history and week-over-week comparison
+- [ ] Decision tracking: what was recommended, what was chosen, what happened
+- [ ] Mobile brief reader
+- [ ] Rate limiting, monitoring, billing
 
-**Goal:** Production-ready SaaS that executives can use daily to run their business.
+**Goal:** A production SaaS that measures whether its recommendations were right.
 
 ---
 
 ## Version Summary
 
-| Version | Focus | Key Integration |
-|---------|-------|-----------------|
-| v0.1 | Mock backend + frontend | None |
-| v0.2 | Calendar | Google Calendar |
-| v0.3 | Inbox | Gmail |
-| v0.4 | CRM | GoHighLevel |
-| v0.5 | AI Intelligence | OpenAI |
-| v0.6 | Automation | Make.com, ClickUp |
-| v1.0 | Production SaaS | All integrations + auth |
+| Version | Focus | Integration |
+|---------|-------|-------------|
+| v1.0 | Full product, curated data | None |
+| v1.1 | Meeting intelligence | Google Calendar |
+| v1.2 | Inbox intelligence | Gmail |
+| v1.3 | Real generation | OpenAI |
+| v1.4 | Client risk and context | GoHighLevel, Notion |
+| v1.5 | Scheduled delivery | n8n |
+| v2.0 | Multi-tenant production | All, plus auth |

@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-logger = logging.getLogger("relay.request")
+logger = logging.getLogger("briefly.request")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "Relay API"
-    app_version: str = "0.1.0"
+    app_name: str = "Briefly API"
+    app_version: str = "1.0.0"
     debug: bool = False
     environment: str = "development"
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Database (PostgreSQL on Railway)
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/relay"
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/briefly"
 
     # CORS — comma-separated in .env, list in code
     cors_origins: list[str] = [

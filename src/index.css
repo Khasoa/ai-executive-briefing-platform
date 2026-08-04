@@ -2,99 +2,137 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: "Newsreader", ui-serif, Georgia, Cambria, serif;
 
-  /* Warm executive palette */
-  --color-background: #fcfcfb;
-  --color-foreground: #2c2a26;
+  /* Surfaces — off white page, white cards */
+  --color-background: #fafaf9;
   --color-card: #ffffff;
-  --color-card-foreground: #2c2a26;
-  --color-muted: #f5f4f1;
-  --color-muted-foreground: #78736a;
-  --color-border: #e8e6e1;
-  --color-primary: #3d3832;
-  --color-primary-foreground: #fcfcfb;
-  --color-accent: #f7f0eb;
-  --color-accent-foreground: #4a4038;
-  --color-destructive: #c45c5c;
-  --color-success: #6b8f71;
-  --color-warning: #b8954a;
-  --color-info: #7b8fa1;
-  --color-coral: #c4714a;
-  --color-peach: #f5e6dc;
-  --color-gold: #c4a962;
-  --color-sage: #8fa68f;
-  --color-lavender: #a89bb0;
-  --color-champagne: #f0ebe4;
+  --color-muted: #f4f4f3;
+  --color-subtle: #f8f8f7;
 
-  --radius-sm: 0.75rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.5rem;
+  /* Text — slate */
+  --color-foreground: #1c1f24;
+  --color-secondary-foreground: #4a5158;
+  --color-muted-foreground: #6b7280;
+  --color-faint: #9ca3af;
+
+  /* Lines */
+  --color-border: #e6e6e3;
+  --color-border-strong: #d6d6d1;
+
+  /* Primary — deep emerald */
+  --color-primary: #065f46;
+  --color-primary-hover: #054e3a;
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #edf6f2;
+  --color-primary-ring: #0a7a5a;
+
+  /* Accent — warm amber */
+  --color-accent: #b45309;
+  --color-accent-strong: #d97706;
+  --color-accent-soft: #fdf6ec;
+
+  /* Signal */
+  --color-critical: #a4302b;
+  --color-critical-soft: #fdf1f0;
+  --color-positive: #176146;
+  --color-neutral: #5b6470;
+  --color-neutral-soft: #f2f3f4;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
     min-height: 100vh;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
 
   #root {
     min-height: 100vh;
   }
 
-  h1, h2, h3, h4 {
-    letter-spacing: -0.02em;
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.019em;
+  }
+
+  ::selection {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  /* Restrained, uniform scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #dcdcd8;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c6c6c1;
+    background-clip: content-box;
   }
 }
 
 @layer utilities {
+  .surface {
+    box-shadow:
+      0 1px 2px rgba(28, 31, 36, 0.04),
+      0 1px 1px rgba(28, 31, 36, 0.02);
+  }
+
+  .surface-raised {
+    box-shadow:
+      0 1px 2px rgba(28, 31, 36, 0.04),
+      0 8px 24px -12px rgba(28, 31, 36, 0.14);
+  }
+
+  .surface-overlay {
+    box-shadow:
+      0 1px 2px rgba(28, 31, 36, 0.06),
+      0 16px 48px -16px rgba(28, 31, 36, 0.22);
+  }
+
+  /* Restrained glass, used only for the sticky page header */
   .glass {
-    background: rgba(252, 252, 251, 0.72);
-    backdrop-filter: blur(24px) saturate(1.15);
-    -webkit-backdrop-filter: blur(24px) saturate(1.15);
+    background: rgba(250, 250, 249, 0.82);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
   }
 
-  .glass-sidebar {
-    background: rgba(252, 252, 251, 0.78);
-    backdrop-filter: blur(28px) saturate(1.2);
-    -webkit-backdrop-filter: blur(28px) saturate(1.2);
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 
-  .gradient-mesh {
-    background:
-      radial-gradient(ellipse 90% 60% at 0% 0%, rgba(245, 230, 220, 0.45), transparent 55%),
-      radial-gradient(ellipse 70% 50% at 100% 5%, rgba(240, 235, 228, 0.4), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(232, 228, 220, 0.3), transparent 55%),
-      #fcfcfb;
-  }
-
-  .card-shadow {
-    box-shadow:
-      0 1px 2px rgba(44, 42, 38, 0.03),
-      0 4px 20px rgba(44, 42, 38, 0.04);
-  }
-
-  .card-shadow-hover {
-    box-shadow:
-      0 2px 4px rgba(44, 42, 38, 0.04),
-      0 12px 32px rgba(44, 42, 38, 0.07);
-  }
-
-  .card-lift {
-    transition:
-      transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
-      box-shadow 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
-      border-color 0.3s ease;
-  }
-
-  .card-lift:hover {
-    transform: translateY(-2px);
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .text-balance {
@@ -102,27 +140,62 @@
   }
 
   .shimmer {
-    background: linear-gradient(
-      90deg,
-      #f5f4f1 0%,
-      #faf9f7 50%,
-      #f5f4f1 100%
-    );
+    background: linear-gradient(90deg, #f1f1ef 0%, #f7f7f5 50%, #f1f1ef 100%);
     background-size: 200% 100%;
-    animation: shimmer 1.8s ease-in-out infinite;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
-  @keyframes gentle-pulse {
-    0%, 100% { opacity: 0.35; }
-    50% { opacity: 0.85; }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
-  .typing-dot {
-    animation: gentle-pulse 1.4s ease-in-out infinite;
+  .pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+}
+
+/* The Morning Brief is meant to be printed or presented. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .print-page {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .surface,
+  .surface-raised {
+    box-shadow: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
