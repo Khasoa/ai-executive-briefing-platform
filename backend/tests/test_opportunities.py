@@ -46,7 +46,7 @@ def _fake_opportunity_row(**overrides) -> Opportunity:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `CRMService._load_opportunities()`."""
+    """Just enough of the SQLAlchemy `Query` surface for `CRMService.list_opportunities()`."""
 
     def __init__(self, rows):
         self._rows = rows
@@ -59,7 +59,7 @@ class _FakeQuery:
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
-    """Patches `Session.query` for one test so `_load_opportunities()` runs
+    """Patches `Session.query` for one test so `list_opportunities()` runs
     its real try/except and empty-table checks against a fake result set,
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""

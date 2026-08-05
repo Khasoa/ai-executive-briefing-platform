@@ -1,12 +1,13 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models import Opportunity
 from app.schemas.crm import CRMResponse, OpportunitySchema
 from app.services import mock_data
+from app.services.db_fallback import load_rows_with_fallback
+from app.services.mapping_utils import jsonb_or_default, stringify_id
 
 logger = logging.getLogger("briefly.crm")
 
@@ -21,14 +22,19 @@ class CRMService:
     `opportunities` table when rows exist there, falling back to
     `mock_data.OPPORTUNITIES` otherwise — including when the database itself
     is unreachable. Same fallback pattern as `MeetingService` and
-    `InboxService`; see `_load_opportunities()` for the mechanics.
+    `InboxService`; see `list_opportunities()` for the mechanics.
+
+    `list_opportunities()` is public on purpose: it is the one place that
+    knows how to load opportunities, so any other service that needs
+    pipeline data (`WorkspaceService`) calls it instead of reading
+    `mock_data.OPPORTUNITIES` directly.
     """
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_pipeline(self) -> CRMResponse:
-        opportunities = self._load_opportunities()
+        opportunities = self.list_opportunities()
         needing_attention = [o for o in opportunities if o["riskLevel"] in _ATTENTION_LEVELS]
 
         return CRMResponse(
@@ -45,10 +51,10 @@ class CRMService:
         )
 
     def get_opportunity(self, opportunity_id: str) -> OpportunitySchema:
-        # Reuses `_load_opportunities()` rather than a dedicated lookup so a
+        # Reuses `list_opportunities()` rather than a dedicated lookup so a
         # single request never mixes a database-backed list with a
         # mock-backed one, matching `MeetingService.get_meeting()`.
-        for opportunity in self._load_opportunities():
+        for opportunity in self.list_opportunities():
             if opportunity["id"] == opportunity_id:
                 return OpportunitySchema(**opportunity)
 
@@ -57,7 +63,7 @@ class CRMService:
             detail=f"Opportunity '{opportunity_id}' not found",
         )
 
-    def _load_opportunities(self) -> list[dict]:
+    def list_opportunities(self) -> list[dict]:
         """Read every opportunity from PostgreSQL, falling back to `mock_data.OPPORTUNITIES`.
 
         Fallback strategy: the same two situations as `MeetingService` and
@@ -68,21 +74,18 @@ class CRMService:
         problem degrades the CRM page rather than breaking it. An empty
         result is logged at info level (a normal, expected state before
         seeding); a database error is logged as a warning (something is
-        actually wrong).
+        actually wrong). The actual try/except and empty check live in
+        `load_rows_with_fallback`, shared with `MeetingService`,
+        `InboxService` and `IntegrationService`.
         """
-        try:
-            rows = self.db.query(Opportunity).order_by(Opportunity.close_date.asc()).all()
-        except SQLAlchemyError:
-            logger.warning(
-                "Could not read opportunities — falling back to mock_data", exc_info=True
-            )
-            return mock_data.OPPORTUNITIES
-
-        if not rows:
-            logger.info("No opportunities in the database yet — serving mock_data")
-            return mock_data.OPPORTUNITIES
-
-        return [self._to_dict(row) for row in rows]
+        return load_rows_with_fallback(
+            query=lambda: self.db.query(Opportunity).order_by(Opportunity.close_date.asc()).all(),
+            to_dict=self._to_dict,
+            fallback=mock_data.OPPORTUNITIES,
+            logger=logger,
+            label="opportunities",
+            db=self.db,
+        )
 
     @staticmethod
     def _to_dict(opportunity: Opportunity) -> dict:
@@ -93,10 +96,10 @@ class CRMService:
         `last_interaction` JSONB blob as an extra key, alongside `type`,
         `summary` and `time`, rather than requiring a schema change.
         """
-        last_interaction = opportunity.last_interaction or {}
+        last_interaction = jsonb_or_default(opportunity.last_interaction)
         close_date = opportunity.close_date
         return {
-            "id": str(opportunity.id),
+            "id": stringify_id(opportunity.id),
             "company": opportunity.company,
             "logo": opportunity.logo,
             "industry": opportunity.industry,

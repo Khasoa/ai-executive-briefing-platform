@@ -7,16 +7,17 @@ Usage (from backend/):
 Run this only after applying the Alembic migration that creates the current
 `integrations` shape (provider/status/account/scopes/config/last_sync_at/
 connected_at — see `app.models.Integration`). This script writes directly
-through the `Integration` ORM model rather than through a service method,
-because `IntegrationService` is intentionally read-only for connection
-state: it only ever *retrieves* integrations for the API (see
-`IntegrationService._load_integrations()`), so there is no write path to
-route through. Integrations need a `user_id`, so this script also finds or
-creates a demo user matching `mock_data.USER`.
+through the `Integration` ORM model. `IntegrationService` owns reads and
+sync-triggered writes (`status` / `SyncEvent`) but has no "create
+connection" path yet — that waits on OAuth. Integrations need a
+`user_id`, so this script also finds or creates a demo user matching
+`mock_data.USER`.
 
 This does not touch authentication or OAuth: `config` here holds only the
 display metadata (name/category/description/metrics/poweredBy) that the
 model has no dedicated columns for — no real tokens are stored or read.
+Providers match `mock_data.INTEGRATIONS` (Calendar, Gmail, Notion,
+GoHighLevel, OpenAI, n8n).
 """
 
 import sys
@@ -25,21 +26,14 @@ from pathlib import Path
 
 # Allows `python scripts/seed_integrations.py` to work without installing
 # the package: put the backend root (this file's grandparent) on the path
-# so `from app...` resolves the same way it does under uvicorn.
+# so `from app...` resolves the same way it does under uvicorn, and put
+# this file's own directory on the path so `seed_common` resolves too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db.session import SessionLocal  # noqa: E402
-from app.models import Integration, User  # noqa: E402
-
-DEMO_USER = {
-    "email": "lydia@arcadiasystems.com",
-    "name": "Lydia",
-    "full_name": "Lydia Reyes",
-    "role": "Founder & CEO",
-    "company": "Arcadia Systems",
-    "avatar": "LR",
-    "timezone": "Europe/Athens",
-}
+from app.models import Integration  # noqa: E402
+from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
 _NOW = datetime.now(timezone.utc)
 
@@ -104,24 +98,6 @@ INTEGRATIONS = [
         },
     ),
     dict(
-        provider="slack",
-        status="not-connected",
-        account=None,
-        scopes=["channels:read", "chat:write"],
-        last_sync_at=None,
-        connected_at=None,
-        config={
-            "name": "Slack",
-            "category": "Messaging",
-            "description": "Surface urgent threads and post the morning brief to a channel.",
-            "metrics": [
-                {"label": "Channels", "value": "0"},
-                {"label": "Messages indexed", "value": "0"},
-            ],
-            "poweredBy": "Slack API",
-        },
-    ),
-    dict(
         provider="gohighlevel",
         status="syncing",
         account="Arcadia Systems · Location 4821",
@@ -139,25 +115,49 @@ INTEGRATIONS = [
             "poweredBy": "GoHighLevel API v2",
         },
     ),
+    dict(
+        provider="openai",
+        status="connected",
+        account="Organisation · arcadia-systems",
+        scopes=["responses.write"],
+        last_sync_at=_minutes_ago(2),
+        connected_at=_NOW - timedelta(days=200),
+        config={
+            "name": "OpenAI",
+            "category": "Intelligence",
+            "description": "Summarisation, prioritisation and drafting for every generated brief.",
+            "metrics": [
+                {"label": "Model", "value": "gpt-5.1"},
+                {"label": "Briefs generated", "value": "128"},
+            ],
+            "poweredBy": "OpenAI Platform",
+        },
+    ),
+    dict(
+        provider="n8n",
+        status="not-connected",
+        account=None,
+        scopes=["workflow.execute"],
+        last_sync_at=None,
+        connected_at=None,
+        config={
+            "name": "n8n",
+            "category": "Automation",
+            "description": "Scheduled brief generation and downstream workflow triggers.",
+            "metrics": [
+                {"label": "Workflows", "value": "0"},
+                {"label": "Runs this month", "value": "0"},
+            ],
+            "poweredBy": "n8n Cloud",
+        },
+    ),
 ]
-
-
-def _get_or_create_demo_user(db) -> User:
-    user = db.query(User).filter(User.email == DEMO_USER["email"]).first()
-    if user:
-        return user
-
-    user = User(**DEMO_USER)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
 
 
 def seed() -> None:
     db = SessionLocal()
     try:
-        user = _get_or_create_demo_user(db)
+        user = get_or_create_demo_user(db)
 
         # Idempotent by provider: re-running the script after a partial seed
         # (or in CI) never creates duplicate integrations for the demo user.
@@ -168,17 +168,15 @@ def seed() -> None:
             .all()
         }
 
-        created = 0
-        for integration in INTEGRATIONS:
-            if integration["provider"] in existing_providers:
-                print(f"Skipping '{integration['provider']}' — already seeded")
-                continue
-
-            db.add(Integration(user_id=user.id, **integration))
-            created += 1
-
-        db.commit()
-        print(f"Seeded {created} integration(s) for {user.email}")
+        seed_idempotently(
+            db,
+            model=Integration,
+            user=user,
+            items=INTEGRATIONS,
+            existing_keys=existing_providers,
+            key_fn=lambda integration: integration["provider"],
+            label="integration(s)",
+        )
     finally:
         db.close()
 

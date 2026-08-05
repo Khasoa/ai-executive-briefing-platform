@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,9 @@ class SyncEvent(Base):
     """Audit trail of every read Briefly has made from a connected system."""
 
     __tablename__ = "sync_events"
+    __table_args__ = (
+        Index("ix_sync_events_integration_time", "integration_id", "occurred_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     integration_id: Mapped[uuid.UUID] = mapped_column(

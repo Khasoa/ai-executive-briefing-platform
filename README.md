@@ -71,10 +71,13 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+# Configure DATABASE_URL, then:
+alembic upgrade head
+# Optional demo data (idempotent): see backend/README.md
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md).
 
 ### Frontend
 

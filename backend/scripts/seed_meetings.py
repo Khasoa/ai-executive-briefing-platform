@@ -9,7 +9,7 @@ Run this only after applying the Alembic migration that creates the current
 company/intelligence/sources — see `app.models.Meeting`). This script writes
 directly through the `Meeting` ORM model rather than through a service
 method, because `MeetingService` is intentionally read-only: it only ever
-*retrieves* meetings for the API (see `MeetingService._load_meetings()`), so
+*retrieves* meetings for the API (see `MeetingService.list_meetings()`), so
 there is no write path to route through. Meetings need a `user_id`, so this
 script also finds or creates a demo user matching `mock_data.USER`.
 """
@@ -20,26 +20,19 @@ from pathlib import Path
 
 # Allows `python scripts/seed_meetings.py` to work without installing the
 # package: put the backend root (this file's grandparent) on the path so
-# `from app...` resolves the same way it does under uvicorn.
+# `from app...` resolves the same way it does under uvicorn, and put this
+# file's own directory on the path so `seed_common` resolves too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db.session import SessionLocal  # noqa: E402
-from app.models import Meeting, User  # noqa: E402
+from app.models import Meeting  # noqa: E402
+from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
 # Matches mock_data.USER / mock_data.BRIEF_DATE so seeded meetings sit
 # consistently alongside the rest of the mocked morning brief.
 ATHENS = timezone(timedelta(hours=3))
 MEETING_DATE = (2026, 8, 4)
-
-DEMO_USER = {
-    "email": "lydia@arcadiasystems.com",
-    "name": "Lydia",
-    "full_name": "Lydia Reyes",
-    "role": "Founder & CEO",
-    "company": "Arcadia Systems",
-    "avatar": "LR",
-    "timezone": "Europe/Athens",
-}
 
 
 def _at(hour: int, minute: int) -> datetime:
@@ -342,22 +335,10 @@ MEETINGS = [
 ]
 
 
-def _get_or_create_demo_user(db) -> User:
-    user = db.query(User).filter(User.email == DEMO_USER["email"]).first()
-    if user:
-        return user
-
-    user = User(**DEMO_USER)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def seed() -> None:
     db = SessionLocal()
     try:
-        user = _get_or_create_demo_user(db)
+        user = get_or_create_demo_user(db)
 
         # Idempotent by title: re-running the script after a partial seed
         # (or in CI) never creates duplicate meetings for the demo user.
@@ -365,17 +346,15 @@ def seed() -> None:
             title for (title,) in db.query(Meeting.title).filter(Meeting.user_id == user.id).all()
         }
 
-        created = 0
-        for meeting in MEETINGS:
-            if meeting["title"] in existing_titles:
-                print(f"Skipping '{meeting['title']}' — already seeded")
-                continue
-
-            db.add(Meeting(user_id=user.id, **meeting))
-            created += 1
-
-        db.commit()
-        print(f"Seeded {created} meeting(s) for {user.email}")
+        seed_idempotently(
+            db,
+            model=Meeting,
+            user=user,
+            items=MEETINGS,
+            existing_keys=existing_titles,
+            key_fn=lambda meeting: meeting["title"],
+            label="meeting(s)",
+        )
     finally:
         db.close()
 

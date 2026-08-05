@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +14,10 @@ class MorningBrief(Base):
     """The product's primary output — one generated briefing."""
 
     __tablename__ = "morning_briefs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "brief_date", name="uq_brief_per_user_per_day"),
+        Index("ix_morning_briefs_user_date", "user_id", "brief_date"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

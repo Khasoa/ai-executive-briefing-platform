@@ -53,7 +53,7 @@ def _fake_meeting_row(**overrides) -> Meeting:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `MeetingService._load_meetings()`."""
+    """Just enough of the SQLAlchemy `Query` surface for `MeetingService.list_meetings()`."""
 
     def __init__(self, rows):
         self._rows = rows
@@ -66,7 +66,7 @@ class _FakeQuery:
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
-    """Patches `Session.query` for one test so `_load_meetings()` runs its
+    """Patches `Session.query` for one test so `list_meetings()` runs its
     real try/except and empty-table checks against a fake result set,
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""

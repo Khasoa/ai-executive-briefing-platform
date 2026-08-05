@@ -42,7 +42,7 @@ def _fake_email_row(**overrides) -> Email:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `InboxService._load_emails()`."""
+    """Just enough of the SQLAlchemy `Query` surface for `InboxService.list_emails()`."""
 
     def __init__(self, rows):
         self._rows = rows
@@ -55,7 +55,7 @@ class _FakeQuery:
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
-    """Patches `Session.query` for one test so `_load_emails()` runs its
+    """Patches `Session.query` for one test so `list_emails()` runs its
     real try/except and empty-table checks against a fake result set,
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""

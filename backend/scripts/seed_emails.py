@@ -10,7 +10,7 @@ suggested_response/reading_time/thread_count/unread/labels/received_at —
 see `app.models.Email`). This script writes directly through the `Email`
 ORM model rather than through a service method, because `InboxService` is
 intentionally read-only: it only ever *retrieves* emails for the API (see
-`InboxService._load_emails()`), so there is no write path to route through.
+`InboxService.list_emails()`), so there is no write path to route through.
 Emails need a `user_id`, so this script also finds or creates a demo user
 matching `mock_data.USER`.
 """
@@ -21,25 +21,18 @@ from pathlib import Path
 
 # Allows `python scripts/seed_emails.py` to work without installing the
 # package: put the backend root (this file's grandparent) on the path so
-# `from app...` resolves the same way it does under uvicorn.
+# `from app...` resolves the same way it does under uvicorn, and put this
+# file's own directory on the path so `seed_common` resolves too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db.session import SessionLocal  # noqa: E402
-from app.models import Email, User  # noqa: E402
+from app.models import Email  # noqa: E402
+from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
 # Matches mock_data.USER so seeded emails sit consistently alongside the
 # rest of the mocked morning brief.
 ATHENS = timezone(timedelta(hours=3))
-
-DEMO_USER = {
-    "email": "lydia@arcadiasystems.com",
-    "name": "Lydia",
-    "full_name": "Lydia Reyes",
-    "role": "Founder & CEO",
-    "company": "Arcadia Systems",
-    "avatar": "LR",
-    "timezone": "Europe/Athens",
-}
 
 
 def _at(month: int, day: int, hour: int, minute: int) -> datetime:
@@ -152,40 +145,27 @@ EMAILS = [
 ]
 
 
-def _get_or_create_demo_user(db) -> User:
-    user = db.query(User).filter(User.email == DEMO_USER["email"]).first()
-    if user:
-        return user
-
-    user = User(**DEMO_USER)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def seed() -> None:
     db = SessionLocal()
     try:
-        user = _get_or_create_demo_user(db)
+        user = get_or_create_demo_user(db)
 
         # Idempotent by subject: re-running the script after a partial seed
         # (or in CI) never creates duplicate emails for the demo user.
         existing_subjects = {
-            subject for (subject,) in db.query(Email.subject).filter(Email.user_id == user.id).all()
+            subject
+            for (subject,) in db.query(Email.subject).filter(Email.user_id == user.id).all()
         }
 
-        created = 0
-        for email in EMAILS:
-            if email["subject"] in existing_subjects:
-                print(f"Skipping '{email['subject']}' — already seeded")
-                continue
-
-            db.add(Email(user_id=user.id, **email))
-            created += 1
-
-        db.commit()
-        print(f"Seeded {created} email(s) for {user.email}")
+        seed_idempotently(
+            db,
+            model=Email,
+            user=user,
+            items=EMAILS,
+            existing_keys=existing_subjects,
+            key_fn=lambda email: email["subject"],
+            label="email(s)",
+        )
     finally:
         db.close()
 

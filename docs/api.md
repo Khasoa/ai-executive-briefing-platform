@@ -26,6 +26,8 @@ Sources cited by the AI are one of: `Gmail`, `Google Calendar`, `GoHighLevel`, `
 
 Lightweight payload for the application shell. Fetched once by the layout rather than by each page.
 
+`brief` freshness comes from `MorningBriefService.get_brief_meta()` (today's `morning_briefs` row when present, otherwise curated `BRIEF_META`). Badge counts are derived from `InboxService` / `MeetingService` / `CRMService`.
+
 ```json
 {
   "user": {
@@ -195,6 +197,8 @@ Direct read of the newest row in `daily_briefs` — the table backing part of `/
 
 The full briefing. Nine sections plus a closing answer, in reading order.
 
+**PostgreSQL migration (Phase 7):** the report itself — `meta` (except `date`, which is derived from `brief_date`), `executiveSummary`, `topPriorities`, `criticalRisks`, `clientsNeedingAttention`, `suggestedFocus`, `recommendedDelegation` and `closing` — is read from the `morning_briefs` table for today's row, and `actionChecklist` from `brief_actions`. If no row exists for today (empty table) or PostgreSQL is unreachable, this generates today's brief from curated data and tries to persist it, so the next request finds a real row. If that persistence attempt also fails — most likely `morning_briefs`/`brief_actions` do not exist in the connected database yet — the response falls all the way back to the pre-migration behaviour: every field straight from curated data, including the stable `chk_1`…`chk_6` checklist ids. `meetings` and `importantEmails` are not stored on `MorningBrief` — they are pulled live from `MeetingService`/`InboxService` on every call (Phase 6), so the brief never shows a meeting or email that has since changed elsewhere. See `MorningBriefService` for the mechanics. Seed data with `backend/scripts/seed_morning_brief.py`.
+
 ```json
 {
   "meta": { "…": "brief provenance, see /workspace" },
@@ -272,6 +276,8 @@ The full briefing. Nine sections plus a closing answer, in reading order.
 
 Re-runs generation against the latest data from every connected system. Returns the same shape as `GET /morning-brief` with refreshed `meta.generatedAt` and `meta.generatedLabel`.
 
+Creates today's `MorningBrief` row if one does not exist yet, or replaces its report content if one does — but never recreates `BriefAction` rows for a brief that already has them, so regenerating the report never rewinds checklist progress the executive already made.
+
 ### `PATCH /morning-brief/checklist/{item_id}`
 
 Marks a checklist item complete or incomplete. This is the only brief state the executive edits directly.
@@ -280,11 +286,13 @@ Marks a checklist item complete or incomplete. This is the only brief state the 
 
 **Response 200:** the updated checklist item. **404** if the item does not exist.
 
+Updates the `BriefAction` row in PostgreSQL (setting `completedAt` when marked done, clearing it otherwise). If `item_id` is not a persisted `BriefAction` — most likely because persistence is not available yet — this falls back to mutating the curated `chk_1`…`chk_6` items in place, matching the pre-migration behaviour.
+
 ---
 
 ## Inbox
 
-**Partial PostgreSQL migration (Phase 3):** `emails` (and the per-category `count`s derived from them) are read from the `emails` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `summary` is a separate aggregate stat, not derived from the email list, so it always comes from curated data for now. Same fallback shape as `MeetingService`'s Phase 2 migration; see `InboxService._load_emails()` for the mechanics. Seed data with `backend/scripts/seed_emails.py`.
+**Partial PostgreSQL migration (Phase 3):** `emails` (and the per-category `count`s derived from them) are read from the `emails` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `summary` is a separate aggregate stat, not derived from the email list, so it always comes from curated data for now. Same fallback shape as `MeetingService`'s Phase 2 migration; see `InboxService.list_emails()` for the mechanics. Seed data with `backend/scripts/seed_emails.py`.
 
 ### `GET /inbox`
 
@@ -339,7 +347,7 @@ Summarised threads grouped into executive categories.
 
 ## Meetings
 
-**Partial PostgreSQL migration (Phase 2):** meetings are read from the `meetings` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `/overview`'s Phase 1 migration; see `MeetingService._load_meetings()` for the mechanics. Seed data with `backend/scripts/seed_meetings.py`.
+**Partial PostgreSQL migration (Phase 2):** meetings are read from the `meetings` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `/overview`'s Phase 1 migration; see `MeetingService.list_meetings()` for the mechanics. Seed data with `backend/scripts/seed_meetings.py`.
 
 ### `GET /meetings`
 
@@ -407,7 +415,7 @@ A single meeting object. **404** if it does not exist.
 
 ## CRM
 
-**Partial PostgreSQL migration (Phase 4):** `opportunities` (and the pipeline totals derived from them) are read from the `opportunities` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `MeetingService`/`InboxService`; see `CRMService._load_opportunities()` for the mechanics. Seed data with `backend/scripts/seed_opportunities.py`.
+**Partial PostgreSQL migration (Phase 4):** `opportunities` (and the pipeline totals derived from them) are read from the `opportunities` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `MeetingService`/`InboxService`; see `CRMService.list_opportunities()` for the mechanics. Seed data with `backend/scripts/seed_opportunities.py`.
 
 ### `GET /crm`
 
@@ -518,7 +526,7 @@ Questions that do not match a known report fall back to a generic cited response
 
 ## Integrations
 
-**Partial PostgreSQL migration (Phase 5):** `integrations` (and `connectedCount`/`totalCount` derived from them) are read from the `integrations` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `syncHistory` is a separate concern from connection status and is not part of this phase, so it stays sourced from curated data regardless. Same fallback shape as `MeetingService`/`InboxService`/`CRMService`; see `IntegrationService._load_integrations()` for the mechanics. Seed data with `backend/scripts/seed_integrations.py`. No authentication or OAuth token handling changed — `config` only carries display metadata (name/category/description/metrics/poweredBy).
+**PostgreSQL persistence:** `integrations` (and `connectedCount`/`totalCount`) come from the `integrations` table; `syncHistory` comes from `sync_events`. Both fall back to curated data when empty or unreachable. Manual sync (`POST /integrations/{id}/sync`) updates the Integration row and inserts a `SyncEvent` when persistence is available. See `IntegrationService.list_integrations()` / `list_sync_history()`. Seed with `backend/scripts/seed_integrations.py` then `seed_sync_events.py`. No OAuth tokens are stored yet — `config` only carries display metadata.
 
 ### `GET /integrations`
 

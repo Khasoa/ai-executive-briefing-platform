@@ -10,7 +10,7 @@ risk_level/last_interaction/ai_summary/recommended_action/signals — see
 `app.models.Opportunity`). This script writes directly through the
 `Opportunity` ORM model rather than through a service method, because
 `CRMService` is intentionally read-only: it only ever *retrieves* the
-pipeline for the API (see `CRMService._load_opportunities()`), so there is
+pipeline for the API (see `CRMService.list_opportunities()`), so there is
 no write path to route through. Opportunities need a `user_id`, so this
 script also finds or creates a demo user matching `mock_data.USER`.
 """
@@ -21,21 +21,14 @@ from pathlib import Path
 
 # Allows `python scripts/seed_opportunities.py` to work without installing
 # the package: put the backend root (this file's grandparent) on the path so
-# `from app...` resolves the same way it does under uvicorn.
+# `from app...` resolves the same way it does under uvicorn, and put this
+# file's own directory on the path so `seed_common` resolves too.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db.session import SessionLocal  # noqa: E402
-from app.models import Opportunity, User  # noqa: E402
-
-DEMO_USER = {
-    "email": "lydia@arcadiasystems.com",
-    "name": "Lydia",
-    "full_name": "Lydia Reyes",
-    "role": "Founder & CEO",
-    "company": "Arcadia Systems",
-    "avatar": "LR",
-    "timezone": "Europe/Athens",
-}
+from app.models import Opportunity  # noqa: E402
+from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
 OPPORTUNITIES = [
     # Enterprise SaaS renewal
@@ -167,22 +160,10 @@ OPPORTUNITIES = [
 ]
 
 
-def _get_or_create_demo_user(db) -> User:
-    user = db.query(User).filter(User.email == DEMO_USER["email"]).first()
-    if user:
-        return user
-
-    user = User(**DEMO_USER)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def seed() -> None:
     db = SessionLocal()
     try:
-        user = _get_or_create_demo_user(db)
+        user = get_or_create_demo_user(db)
 
         # Idempotent by company + stage: re-running the script after a
         # partial seed (or in CI) never creates duplicate opportunities for
@@ -194,18 +175,16 @@ def seed() -> None:
             .all()
         }
 
-        created = 0
-        for opportunity in OPPORTUNITIES:
-            key = (opportunity["company"], opportunity["stage"])
-            if key in existing:
-                print(f"Skipping '{opportunity['company']} — {opportunity['stage']}' — already seeded")
-                continue
-
-            db.add(Opportunity(user_id=user.id, **opportunity))
-            created += 1
-
-        db.commit()
-        print(f"Seeded {created} opportunity(ies) for {user.email}")
+        seed_idempotently(
+            db,
+            model=Opportunity,
+            user=user,
+            items=OPPORTUNITIES,
+            existing_keys=existing,
+            key_fn=lambda opportunity: (opportunity["company"], opportunity["stage"]),
+            describe_fn=lambda o: f"'{o['company']} — {o['stage']}'",
+            label="opportunity(ies)",
+        )
     finally:
         db.close()
 

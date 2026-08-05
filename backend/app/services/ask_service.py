@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.ask import AskReportResponse, AskWorkspaceResponse
 from app.services import mock_data
+from app.services.integration_service import IntegrationService
 
 
 class AskService:
@@ -14,9 +15,14 @@ class AskService:
         self.db = db
 
     def get_workspace(self) -> AskWorkspaceResponse:
+        # Goes through `IntegrationService` rather than `mock_data.INTEGRATIONS`
+        # directly, so `connectedSources` reflects real connection state the
+        # moment `integrations` has rows, matching every other cross-service
+        # read in this refactor.
+        integrations = IntegrationService(self.db).list_integrations()
         connected = [
             integration["name"]
-            for integration in mock_data.INTEGRATIONS
+            for integration in integrations
             if integration["status"] in ("connected", "syncing")
         ]
         return AskWorkspaceResponse(

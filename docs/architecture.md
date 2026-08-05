@@ -15,9 +15,9 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
                             │ REST (JSON, camelCase)
 ┌───────────────────────────▼──────────────────────────────────┐
 │                       FastAPI Backend                        │
-│   Routes ──▶ Services ──▶ Curated data / Database            │
+│   Routes ──▶ Services ──▶ PostgreSQL (+ mock_data fallback)  │
 │                   │                                          │
-│                   └──▶ Integrations (read-only)              │
+│                   └──▶ Integrations (future, read-only)      │
 └───────────────────────────┬──────────────────────────────────┘
                             │
        ┌────────────────────┼─────────────────────┐
@@ -63,23 +63,24 @@ The Morning Brief adds a serif face for long-form passages and a print styleshee
 
 **Services** (`app/services/`) own everything else:
 
-| Service | Domain |
-|---------|--------|
-| `WorkspaceService` | Shell identity and navigation counts |
-| `OverviewService` | Dashboard aggregation across every other domain |
-| `MorningBriefService` | Brief assembly, regeneration, checklist state |
-| `InboxService` | Thread categorisation and counts |
-| `MeetingService` | Meeting intelligence and scheduling maths |
-| `CRMService` | Pipeline filtering, weighting and exposure |
-| `AskService` | Question matching and cited report construction |
-| `IntegrationService` | Connection state and sync triggers |
-| `SettingsService` | Profile, preferences, notifications, security |
+| Service | Owns |
+|---------|------|
+| `WorkspaceService` | Shell payload; badges via Inbox/Meeting/CRM; brief meta via MorningBrief |
+| `OverviewService` | Dashboard; DailyBrief summary slice; brief meta via MorningBrief |
+| `DailyBriefService` | `daily_briefs` |
+| `MorningBriefService` | `morning_briefs`, `brief_actions` |
+| `InboxService` | `emails` |
+| `MeetingService` | `meetings` |
+| `CRMService` | `opportunities` |
+| `AskService` | Cited reports (curated until OpenAI); sources via IntegrationService |
+| `IntegrationService` | `integrations`, `sync_events` |
+| `SettingsService` | Preferences UI state (curated until auth) |
 
-Services currently read from `mock_data.py`. They will read from the database and integration modules without any change to the routes or the API contract.
+Persistence-backed services read PostgreSQL first and fall back to `mock_data.py` when a table is empty or unreachable (`db_fallback.py`). Cross-domain reads never bypass the owning service. Migration history: [migrations.md](./migrations.md).
 
-**Schemas** (`app/schemas/`) define the contract, separate from ORM models. `common.py` holds the shared vocabulary — urgency, severity, confidence, sources and citations — so every endpoint speaks the same language.
+**Schemas** (`app/schemas/`) define the API contract only — separate from ORM models. `common.py` holds the shared vocabulary — urgency, severity, confidence, sources and citations.
 
-**Models** (`app/models/`) describe the persistence target: `User`, `MorningBrief`, `BriefAction`, `Meeting`, `Email`, `Opportunity`, `Integration`, `SyncEvent`.
+**Models** (`app/models/`) are persistence-only: `User`, `MorningBrief`, `BriefAction`, `Meeting`, `Email`, `Opportunity`, `Integration`, `SyncEvent`, `DailyBrief`.
 
 ### Read-only by design
 

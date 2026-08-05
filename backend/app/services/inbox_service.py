@@ -2,12 +2,13 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models import Email
 from app.schemas.inbox import EmailSchema, InboxResponse
 from app.services import mock_data
+from app.services.db_fallback import load_rows_with_fallback
+from app.services.mapping_utils import stringify_id
 
 logger = logging.getLogger("briefly.inbox")
 
@@ -19,17 +20,22 @@ class InboxService:
     table when rows exist there, falling back to `mock_data.EMAILS`
     otherwise — including when the database itself is unreachable. This is
     the same fallback pattern used by `MeetingService`; see
-    `_load_emails()` for the mechanics. There is no separate "EmailService":
+    `list_emails()` for the mechanics. There is no separate "EmailService":
     `InboxService` already owns the `Email` domain end to end (categorising,
     counting and now loading it), so the database read lives here rather
     than in a new, duplicate service.
+
+    `list_emails()` is public on purpose: it is the one place that knows how
+    to load emails, so any other service that needs email data
+    (`MorningBriefService`, `WorkspaceService`) calls it instead of reading
+    `mock_data.EMAILS` directly.
     """
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_inbox(self) -> InboxResponse:
-        emails = self._load_emails()
+        emails = self.list_emails()
         return InboxResponse(
             summary=mock_data.INBOX_SUMMARY,
             categories=self._categories(emails),
@@ -37,10 +43,10 @@ class InboxService:
         )
 
     def get_email(self, email_id: str) -> EmailSchema:
-        # Reuses `_load_emails()` rather than a dedicated lookup so a single
+        # Reuses `list_emails()` rather than a dedicated lookup so a single
         # request never mixes a database-backed list with a mock-backed one,
         # matching the pattern established in `MeetingService.get_meeting()`.
-        for email in self._load_emails():
+        for email in self.list_emails():
             if email["id"] == email_id:
                 return EmailSchema(**email)
 
@@ -49,7 +55,7 @@ class InboxService:
             detail=f"Email '{email_id}' not found",
         )
 
-    def _load_emails(self) -> list[dict]:
+    def list_emails(self) -> list[dict]:
         """Read every email from PostgreSQL, falling back to `mock_data.EMAILS`.
 
         Fallback strategy: the same two situations as `MeetingService` land
@@ -59,25 +65,22 @@ class InboxService:
         empty or broken response, so a database problem degrades the inbox
         rather than breaking it. An empty result is logged at info level (a
         normal, expected state before seeding); a database error is logged
-        as a warning (something is actually wrong).
+        as a warning (something is actually wrong). The actual try/except
+        and empty check live in `load_rows_with_fallback`, shared with
+        `MeetingService`, `CRMService` and `IntegrationService`.
         """
-        try:
-            rows = self.db.query(Email).order_by(Email.received_at.desc()).all()
-        except SQLAlchemyError:
-            logger.warning(
-                "Could not read emails — falling back to mock_data", exc_info=True
-            )
-            return mock_data.EMAILS
-
-        if not rows:
-            logger.info("No emails in the database yet — serving mock_data")
-            return mock_data.EMAILS
-
-        return [self._to_dict(row) for row in rows]
+        return load_rows_with_fallback(
+            query=lambda: self.db.query(Email).order_by(Email.received_at.desc()).all(),
+            to_dict=self._to_dict,
+            fallback=mock_data.EMAILS,
+            logger=logger,
+            label="emails",
+            db=self.db,
+        )
 
     @staticmethod
     def _categories(emails: list[dict]) -> list[dict]:
-        # Counts follow whichever list `_load_emails()` actually returned
+        # Counts follow whichever list `list_emails()` actually returned
         # (database or mock), so they always match the emails in the response.
         return [
             {
@@ -97,7 +100,7 @@ class InboxService:
         the label always stays consistent with the timestamp.
         """
         return {
-            "id": str(email.id),
+            "id": stringify_id(email.id),
             "category": email.category,
             "subject": email.subject,
             "sender": email.sender,

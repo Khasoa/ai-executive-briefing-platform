@@ -1,12 +1,13 @@
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models import Meeting
 from app.schemas.meetings import MeetingSchema, MeetingsResponse
 from app.services import mock_data
+from app.services.db_fallback import load_rows_with_fallback
+from app.services.mapping_utils import jsonb_or_default, stringify_id
 
 logger = logging.getLogger("briefly.meetings")
 
@@ -17,14 +18,19 @@ class MeetingService:
     Phase 2 of the PostgreSQL migration: meetings are read from the
     `meetings` table when rows exist there, falling back to
     `mock_data.MEETINGS` otherwise — including when the database itself is
-    unreachable. See `_load_meetings()` for the fallback mechanics.
+    unreachable. See `list_meetings()` for the fallback mechanics.
+
+    `list_meetings()` is public on purpose: it is the one place that knows
+    how to load meetings, so any other service that needs meeting data
+    (`OverviewService`, `MorningBriefService`, `WorkspaceService`) calls it
+    instead of reading `mock_data.MEETINGS` directly.
     """
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
     def get_meetings(self) -> MeetingsResponse:
-        meetings = self._load_meetings()
+        meetings = self.list_meetings()
         return MeetingsResponse(
             date=mock_data.BRIEF_DATE,
             meetingCount=len(meetings),
@@ -34,11 +40,11 @@ class MeetingService:
         )
 
     def get_meeting(self, meeting_id: str) -> MeetingSchema:
-        # Reuses `_load_meetings()` rather than a dedicated lookup so a single
+        # Reuses `list_meetings()` rather than a dedicated lookup so a single
         # request never mixes a database-backed list with a mock-backed one:
-        # whichever source answered `_load_meetings()` is the only source
+        # whichever source answered `list_meetings()` is the only source
         # `get_meeting()` searches too.
-        for meeting in self._load_meetings():
+        for meeting in self.list_meetings():
             if meeting["id"] == meeting_id:
                 return MeetingSchema(**meeting)
 
@@ -47,7 +53,7 @@ class MeetingService:
             detail=f"Meeting '{meeting_id}' not found",
         )
 
-    def _load_meetings(self) -> list[dict]:
+    def list_meetings(self) -> list[dict]:
         """Read every meeting from PostgreSQL, falling back to `mock_data.MEETINGS`.
 
         Fallback strategy: two situations land here — the table is reachable
@@ -59,21 +65,18 @@ class MeetingService:
         before seeding); a database error is logged as a warning (something
         is actually wrong) — but either way we serve the curated meetings
         instead of returning an empty or broken response, so a database
-        problem degrades this page rather than breaking it.
+        problem degrades this page rather than breaking it. The actual
+        try/except and empty check live in `load_rows_with_fallback`, shared
+        with `InboxService`, `CRMService` and `IntegrationService`.
         """
-        try:
-            rows = self.db.query(Meeting).order_by(Meeting.starts_at.asc()).all()
-        except SQLAlchemyError:
-            logger.warning(
-                "Could not read meetings — falling back to mock_data", exc_info=True
-            )
-            return mock_data.MEETINGS
-
-        if not rows:
-            logger.info("No meetings in the database yet — serving mock_data")
-            return mock_data.MEETINGS
-
-        return [self._to_dict(row) for row in rows]
+        return load_rows_with_fallback(
+            query=lambda: self.db.query(Meeting).order_by(Meeting.starts_at.asc()).all(),
+            to_dict=self._to_dict,
+            fallback=mock_data.MEETINGS,
+            logger=logger,
+            label="meetings",
+            db=self.db,
+        )
 
     @staticmethod
     def _to_dict(meeting: Meeting) -> dict:
@@ -86,9 +89,9 @@ class MeetingService:
         generated preparation rather than raw calendar data, so adding one
         more of them later never needs a schema change.
         """
-        intelligence = meeting.intelligence or {}
+        intelligence = jsonb_or_default(meeting.intelligence)
         return {
-            "id": str(meeting.id),
+            "id": stringify_id(meeting.id),
             "title": meeting.title,
             "startTime": meeting.starts_at.strftime("%H:%M"),
             "endTime": meeting.ends_at.strftime("%H:%M"),
