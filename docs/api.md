@@ -58,6 +58,8 @@ Lightweight payload for the application shell. Fetched once by the layout rather
 
 The executive dashboard: identity, brief provenance, the hero summary, four KPIs, recent activity and three recommendations.
 
+**Partial PostgreSQL migration (Phase 1):** `executiveSummary.summary`, `.priorities` and `.risks` are read from the `daily_briefs` table when a row exists there, and fall back to curated data otherwise — including if the database itself is unreachable. Every other field on this page is still curated data. See [`GET /daily-brief/latest`](#daily-brief) and `OverviewService` for the mechanics.
+
 ```json
 {
   "user": { "…": "see /workspace" },
@@ -155,6 +157,35 @@ The executive dashboard: identity, brief provenance, the hero summary, four KPIs
 **KPI icons:** `inbox`, `meetings`, `deals`, `tasks` · **trend:** `up`, `down`, `neutral` · **tone:** `primary`, `accent`, `slate`
 
 **Activity types:** `email`, `deal`, `document`, `meeting`
+
+---
+
+## Daily Brief
+
+<a id="daily-brief"></a>
+
+### `GET /daily-brief/latest`
+
+Direct read of the newest row in `daily_briefs` — the table backing part of `/overview` (see above). Unlike `/overview`, this endpoint does **not** fall back to curated data: it exists to show what is actually in PostgreSQL, so a missing brief or an unreachable database is a real error here.
+
+```json
+{
+  "id": "1f9d7e2a-6b3c-4e21-9a0e-6a2f8c9d1b44",
+  "generatedAt": "2026-08-04T06:30:00+00:00",
+  "summary": "Meridian Labs has gone quiet for nine days…",
+  "priorities": [{ "…": "PrioritySchema, same shape as /overview" }],
+  "risks": [{ "…": "RiskSchema, same shape as /overview" }],
+  "recommendations": [
+    { "id": "rec_1", "title": "Send the Meridian migration-cost analysis before the 11:00 call", "rationale": "Reframes the conversation around switching cost instead of price." }
+  ],
+  "executiveScore": 74,
+  "createdAt": "2026-08-04T06:30:01+00:00"
+}
+```
+
+- **404** — no `DailyBrief` has been inserted yet (seed one with `backend/scripts/seed_daily_brief.py`)
+
+`recommendations` and `executiveScore` are persisted but not yet read by `/overview` — they are reserved for a later migration phase.
 
 ---
 
@@ -305,6 +336,8 @@ Summarised threads grouped into executive categories.
 ---
 
 ## Meetings
+
+**Partial PostgreSQL migration (Phase 2):** meetings are read from the `meetings` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `/overview`'s Phase 1 migration; see `MeetingService._load_meetings()` for the mechanics. Seed data with `backend/scripts/seed_meetings.py`.
 
 ### `GET /meetings`
 

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     ask,
     crm,
+    daily_brief,
     health,
     inbox,
     integrations,
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(workspace.router)
     app.include_router(overview.router)
+    app.include_router(daily_brief.router)
     app.include_router(morning_brief.router)
     app.include_router(inbox.router)
     app.include_router(meetings.router)

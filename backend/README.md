@@ -36,12 +36,13 @@ app/
 |--------|------|-------------|
 | GET | `/health` | Health check |
 | GET | `/workspace` | Shell payload: identity, brief freshness, nav counts |
-| GET | `/overview` | Executive dashboard |
+| GET | `/overview` | Executive dashboard (summary/priorities/risks partially DB-backed — see below) |
+| GET | `/daily-brief/latest` | Latest `DailyBrief` row, read directly from PostgreSQL |
 | GET | `/morning-brief` | The full briefing |
 | POST | `/morning-brief/regenerate` | Re-run generation against the latest data |
 | PATCH | `/morning-brief/checklist/{item_id}` | Mark a checklist item done |
 | GET | `/inbox` | Categorised, summarised threads |
-| GET | `/meetings` | Meeting intelligence for today |
+| GET | `/meetings` | Meeting intelligence for today (partially DB-backed — see below) |
 | GET | `/meetings/{meeting_id}` | A single meeting |
 | GET | `/crm` | Pipeline with executive-attention filtering |
 | GET | `/ask` | Suggested questions and recent history |
@@ -61,10 +62,11 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | Service | Domain |
 |---------|--------|
 | `WorkspaceService` | Shell identity and navigation counts |
-| `OverviewService` | Dashboard aggregation |
+| `OverviewService` | Dashboard aggregation — reads `summary`/`priorities`/`risks` from `DailyBriefService`, falls back to curated data |
+| `DailyBriefService` | First table backed by real PostgreSQL reads/writes: `create_brief()`, `get_latest_brief()`, `get_brief_by_id()` |
 | `MorningBriefService` | Brief assembly, regeneration, checklist state |
 | `InboxService` | Thread categorisation and counts |
-| `MeetingService` | Meeting intelligence and scheduling maths |
+| `MeetingService` | Meeting intelligence and scheduling maths — reads `meetings` from PostgreSQL, falls back to curated data (Phase 2 of the migration) |
 | `CRMService` | Pipeline filtering, weighting and exposure |
 | `AskService` | Question matching and cited report construction |
 | `IntegrationService` | Connection state and sync triggers |
@@ -77,11 +79,12 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `User` | Executive profile and briefing preferences |
 | `MorningBrief` | One generated briefing |
 | `BriefAction` | Checklist item — the only brief state the user edits |
-| `Meeting` | Calendar event plus generated preparation |
+| `Meeting` | Calendar event plus generated preparation — backs `GET /meetings` (Phase 2 of the migration) |
 | `Email` | Thread with summary, priority and suggested response |
 | `Opportunity` | Pipeline opportunity with risk assessment |
 | `Integration` | Connected provider, scopes and tokens |
 | `SyncEvent` | Audit trail of every read from a connected system |
+| `DailyBrief` | Phase 1 of the PostgreSQL migration — `summary`/`priorities`/`risks` for `OverviewService`, plus `recommendations`/`executive_score` reserved for later |
 
 ## Local Setup
 
@@ -110,7 +113,27 @@ docker run --name briefly-postgres \
 alembic upgrade head
 ```
 
-Connection pooling is configured in `db/session.py` (`pool_size=5`, `max_overflow=10`, `pool_pre_ping=True`).
+Connection pooling is configured in `db/session.py` (`pool_size=5`, `max_overflow=10`, `pool_pre_ping=True`, and a 5s `connect_timeout` so a down database fails fast instead of hanging a request).
+
+### Seeding a DailyBrief
+
+Once the `daily_briefs` table exists (after running your migration):
+
+```bash
+python scripts/seed_daily_brief.py
+```
+
+Inserts one realistic briefing so `/overview` and `/daily-brief/latest` have something real to read instead of falling back to curated data.
+
+### Seeding Meetings
+
+Once the `meetings` table matches `app.models.Meeting` (after running your migration):
+
+```bash
+python scripts/seed_meetings.py
+```
+
+Inserts five realistic meetings (Board Meeting, Investor Update, Customer Success Review, Product Roadmap, Hiring Interview) for a demo user, so `/meetings` has something real to read instead of falling back to curated data. Safe to re-run — it skips titles it already seeded.
 
 ### Tests
 
