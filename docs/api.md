@@ -284,6 +284,8 @@ Marks a checklist item complete or incomplete. This is the only brief state the 
 
 ## Inbox
 
+**Partial PostgreSQL migration (Phase 3):** `emails` (and the per-category `count`s derived from them) are read from the `emails` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `summary` is a separate aggregate stat, not derived from the email list, so it always comes from curated data for now. Same fallback shape as `MeetingService`'s Phase 2 migration; see `InboxService._load_emails()` for the mechanics. Seed data with `backend/scripts/seed_emails.py`.
+
 ### `GET /inbox`
 
 Summarised threads grouped into executive categories.

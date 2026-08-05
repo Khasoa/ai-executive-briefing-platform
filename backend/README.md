@@ -41,7 +41,7 @@ app/
 | GET | `/morning-brief` | The full briefing |
 | POST | `/morning-brief/regenerate` | Re-run generation against the latest data |
 | PATCH | `/morning-brief/checklist/{item_id}` | Mark a checklist item done |
-| GET | `/inbox` | Categorised, summarised threads |
+| GET | `/inbox` | Categorised, summarised threads (partially DB-backed — see below) |
 | GET | `/meetings` | Meeting intelligence for today (partially DB-backed — see below) |
 | GET | `/meetings/{meeting_id}` | A single meeting |
 | GET | `/crm` | Pipeline with executive-attention filtering |
@@ -65,7 +65,7 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `OverviewService` | Dashboard aggregation — reads `summary`/`priorities`/`risks` from `DailyBriefService`, falls back to curated data |
 | `DailyBriefService` | First table backed by real PostgreSQL reads/writes: `create_brief()`, `get_latest_brief()`, `get_brief_by_id()` |
 | `MorningBriefService` | Brief assembly, regeneration, checklist state |
-| `InboxService` | Thread categorisation and counts |
+| `InboxService` | Thread categorisation and counts — reads `emails` from PostgreSQL, falls back to curated data (Phase 3 of the migration) |
 | `MeetingService` | Meeting intelligence and scheduling maths — reads `meetings` from PostgreSQL, falls back to curated data (Phase 2 of the migration) |
 | `CRMService` | Pipeline filtering, weighting and exposure |
 | `AskService` | Question matching and cited report construction |
@@ -80,7 +80,7 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `MorningBrief` | One generated briefing |
 | `BriefAction` | Checklist item — the only brief state the user edits |
 | `Meeting` | Calendar event plus generated preparation — backs `GET /meetings` (Phase 2 of the migration) |
-| `Email` | Thread with summary, priority and suggested response |
+| `Email` | Thread with summary, priority and suggested response — backs `GET /inbox` (Phase 3 of the migration) |
 | `Opportunity` | Pipeline opportunity with risk assessment |
 | `Integration` | Connected provider, scopes and tokens |
 | `SyncEvent` | Audit trail of every read from a connected system |
@@ -134,6 +134,16 @@ python scripts/seed_meetings.py
 ```
 
 Inserts five realistic meetings (Board Meeting, Investor Update, Customer Success Review, Product Roadmap, Hiring Interview) for a demo user, so `/meetings` has something real to read instead of falling back to curated data. Safe to re-run — it skips titles it already seeded.
+
+### Seeding Emails
+
+Once the `emails` table matches `app.models.Email` (after running your migration):
+
+```bash
+python scripts/seed_emails.py
+```
+
+Inserts five realistic emails (a board communication, an investor update, a customer request, an internal announcement and a hiring/recruiting email) for a demo user, so `/inbox` has something real to read instead of falling back to curated data. Safe to re-run — it skips subjects it already seeded.
 
 ### Tests
 
