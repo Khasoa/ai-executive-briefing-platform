@@ -44,10 +44,10 @@ app/
 | GET | `/inbox` | Categorised, summarised threads (partially DB-backed — see below) |
 | GET | `/meetings` | Meeting intelligence for today (partially DB-backed — see below) |
 | GET | `/meetings/{meeting_id}` | A single meeting |
-| GET | `/crm` | Pipeline with executive-attention filtering |
+| GET | `/crm` | Pipeline with executive-attention filtering (partially DB-backed — see below) |
 | GET | `/ask` | Suggested questions and recent history |
 | POST | `/ask` | Answer a question as a cited report |
-| GET | `/integrations` | Connection status and sync history |
+| GET | `/integrations` | Connection status and sync history (connection status partially DB-backed — see below) |
 | POST | `/integrations/{id}/sync` | Trigger a manual read |
 | GET | `/settings` | Profile, preferences, notifications, security, theme |
 | PATCH | `/settings/preferences` | Partial preference update |
@@ -67,9 +67,9 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `MorningBriefService` | Brief assembly, regeneration, checklist state |
 | `InboxService` | Thread categorisation and counts — reads `emails` from PostgreSQL, falls back to curated data (Phase 3 of the migration) |
 | `MeetingService` | Meeting intelligence and scheduling maths — reads `meetings` from PostgreSQL, falls back to curated data (Phase 2 of the migration) |
-| `CRMService` | Pipeline filtering, weighting and exposure |
+| `CRMService` | Pipeline filtering, weighting and exposure — reads `opportunities` from PostgreSQL, falls back to curated data (Phase 4 of the migration) |
 | `AskService` | Question matching and cited report construction |
-| `IntegrationService` | Connection state and sync triggers |
+| `IntegrationService` | Connection state and sync triggers — reads `integrations` from PostgreSQL, falls back to curated data (Phase 5 of the migration) |
 | `SettingsService` | Profile, preferences, notifications, security |
 
 ## Database Models
@@ -81,8 +81,8 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `BriefAction` | Checklist item — the only brief state the user edits |
 | `Meeting` | Calendar event plus generated preparation — backs `GET /meetings` (Phase 2 of the migration) |
 | `Email` | Thread with summary, priority and suggested response — backs `GET /inbox` (Phase 3 of the migration) |
-| `Opportunity` | Pipeline opportunity with risk assessment |
-| `Integration` | Connected provider, scopes and tokens |
+| `Opportunity` | Pipeline opportunity with risk assessment — backs `GET /crm` (Phase 4 of the migration) |
+| `Integration` | Connected provider, scopes and tokens — backs `GET /integrations` (Phase 5 of the migration) |
 | `SyncEvent` | Audit trail of every read from a connected system |
 | `DailyBrief` | Phase 1 of the PostgreSQL migration — `summary`/`priorities`/`risks` for `OverviewService`, plus `recommendations`/`executive_score` reserved for later |
 
@@ -144,6 +144,26 @@ python scripts/seed_emails.py
 ```
 
 Inserts five realistic emails (a board communication, an investor update, a customer request, an internal announcement and a hiring/recruiting email) for a demo user, so `/inbox` has something real to read instead of falling back to curated data. Safe to re-run — it skips subjects it already seeded.
+
+### Seeding Opportunities
+
+Once the `opportunities` table matches `app.models.Opportunity` (after running your migration):
+
+```bash
+python scripts/seed_opportunities.py
+```
+
+Inserts five realistic opportunities (an enterprise SaaS renewal, a new customer acquisition, an expansion, a strategic partnership and an upsell) for a demo user, so `/crm` has something real to read instead of falling back to curated data. Safe to re-run — it skips company/stage pairs it already seeded.
+
+### Seeding Integrations
+
+Once the `integrations` table matches `app.models.Integration` (after running your migration):
+
+```bash
+python scripts/seed_integrations.py
+```
+
+Inserts five realistic integrations (Google Calendar, Gmail and Notion connected; Slack not connected; GoHighLevel mid-sync) for a demo user, so `/integrations` has something real to read instead of falling back to curated data. Safe to re-run — it skips providers it already seeded. Only display metadata (name/category/description/metrics/poweredBy) and connection status are stored — no real OAuth tokens.
 
 ### Tests
 

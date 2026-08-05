@@ -407,6 +407,8 @@ A single meeting object. **404** if it does not exist.
 
 ## CRM
 
+**Partial PostgreSQL migration (Phase 4):** `opportunities` (and the pipeline totals derived from them) are read from the `opportunities` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `MeetingService`/`InboxService`; see `CRMService._load_opportunities()` for the mechanics. Seed data with `backend/scripts/seed_opportunities.py`.
+
 ### `GET /crm`
 
 Only opportunities that warrant executive attention, plus pipeline totals.
@@ -515,6 +517,8 @@ Questions that do not match a known report fall back to a generic cited response
 ---
 
 ## Integrations
+
+**Partial PostgreSQL migration (Phase 5):** `integrations` (and `connectedCount`/`totalCount` derived from them) are read from the `integrations` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `syncHistory` is a separate concern from connection status and is not part of this phase, so it stays sourced from curated data regardless. Same fallback shape as `MeetingService`/`InboxService`/`CRMService`; see `IntegrationService._load_integrations()` for the mechanics. Seed data with `backend/scripts/seed_integrations.py`. No authentication or OAuth token handling changed — `config` only carries display metadata (name/category/description/metrics/poweredBy).
 
 ### `GET /integrations`
 
