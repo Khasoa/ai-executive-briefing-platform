@@ -97,16 +97,17 @@ def get_pipeline(db: Session = Depends(get_db)) -> CRMResponse:
 
 ---
 
-## ADR-008: Curated data behind real service boundaries
+## ADR-008: Demo data behind real service boundaries
 
-**Decision:** Services read from `mock_data.py`, but only through the same methods that will later query the database.
+**Decision:** Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` only when a table is empty or unreachable. Surfaces that are not yet persisted (Ask curated reports, Settings, Overview KPIs/activity/focus) still read `demo_data` through their owning service.
 
 **Why:**
 - The frontend can be built and demonstrated end to end immediately
-- Response shapes are proven against a real UI before an integration is written
-- Computed values (weighted pipeline, prep counts, scheduled minutes) are calculated, not hardcoded, so they stay correct when the source changes
+- Response shapes stay stable while integrations and OpenAI are wired in
+- Empty-table / DB-error fallbacks degrade a page instead of breaking it
+- Computed values (weighted pipeline, prep counts, scheduled minutes) are calculated, not hardcoded
 
-**Trade-off:** Mutations live in process memory and reset on restart. Acceptable while there is no persistence layer wired up.
+**Trade-off:** Fallback and still-curated surfaces reset on process restart when the database is empty. Acceptable until those domains are fully persisted and externally sourced.
 
 ---
 

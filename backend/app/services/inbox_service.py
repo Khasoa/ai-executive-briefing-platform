@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Email
 from app.schemas.inbox import EmailSchema, InboxResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
 from app.services.mapping_utils import stringify_id
 
@@ -17,7 +17,7 @@ class InboxService:
     """Turns raw threads into categorised, summarised executive mail.
 
     Phase 3 of the PostgreSQL migration: emails are read from the `emails`
-    table when rows exist there, falling back to `mock_data.EMAILS`
+    table when rows exist there, falling back to `demo_data.EMAILS`
     otherwise — including when the database itself is unreachable. This is
     the same fallback pattern used by `MeetingService`; see
     `list_emails()` for the mechanics. There is no separate "EmailService":
@@ -28,7 +28,7 @@ class InboxService:
     `list_emails()` is public on purpose: it is the one place that knows how
     to load emails, so any other service that needs email data
     (`MorningBriefService`, `WorkspaceService`) calls it instead of reading
-    `mock_data.EMAILS` directly.
+    `demo_data.EMAILS` directly.
     """
 
     def __init__(self, db: Session) -> None:
@@ -37,7 +37,7 @@ class InboxService:
     def get_inbox(self) -> InboxResponse:
         emails = self.list_emails()
         return InboxResponse(
-            summary=mock_data.INBOX_SUMMARY,
+            summary=demo_data.INBOX_SUMMARY,
             categories=self._categories(emails),
             emails=emails,
         )
@@ -56,7 +56,7 @@ class InboxService:
         )
 
     def list_emails(self) -> list[dict]:
-        """Read every email from PostgreSQL, falling back to `mock_data.EMAILS`.
+        """Read every email from PostgreSQL, falling back to `demo_data.EMAILS`.
 
         Fallback strategy: the same two situations as `MeetingService` land
         here — the table is reachable but empty (nothing seeded yet), or the
@@ -72,7 +72,7 @@ class InboxService:
         return load_rows_with_fallback(
             query=lambda: self.db.query(Email).order_by(Email.received_at.desc()).all(),
             to_dict=self._to_dict,
-            fallback=mock_data.EMAILS,
+            fallback=demo_data.EMAILS,
             logger=logger,
             label="emails",
             db=self.db,
@@ -87,7 +87,7 @@ class InboxService:
                 **category,
                 "count": sum(1 for email in emails if email["category"] == category["id"]),
             }
-            for category in mock_data.INBOX_CATEGORIES
+            for category in demo_data.INBOX_CATEGORIES
         ]
 
     @staticmethod

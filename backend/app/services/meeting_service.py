@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Meeting
 from app.schemas.meetings import MeetingSchema, MeetingsResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
 from app.services.mapping_utils import jsonb_or_default, stringify_id
 
@@ -17,13 +17,13 @@ class MeetingService:
 
     Phase 2 of the PostgreSQL migration: meetings are read from the
     `meetings` table when rows exist there, falling back to
-    `mock_data.MEETINGS` otherwise — including when the database itself is
+    `demo_data.MEETINGS` otherwise — including when the database itself is
     unreachable. See `list_meetings()` for the fallback mechanics.
 
     `list_meetings()` is public on purpose: it is the one place that knows
     how to load meetings, so any other service that needs meeting data
     (`OverviewService`, `MorningBriefService`, `WorkspaceService`) calls it
-    instead of reading `mock_data.MEETINGS` directly.
+    instead of reading `demo_data.MEETINGS` directly.
     """
 
     def __init__(self, db: Session) -> None:
@@ -32,7 +32,7 @@ class MeetingService:
     def get_meetings(self) -> MeetingsResponse:
         meetings = self.list_meetings()
         return MeetingsResponse(
-            date=mock_data.BRIEF_DATE,
+            date=demo_data.BRIEF_DATE,
             meetingCount=len(meetings),
             needsPreparation=sum(1 for m in meetings if m["prepStatus"] == "needs-prep"),
             totalScheduledMinutes=sum(self._minutes(m) for m in meetings),
@@ -54,7 +54,7 @@ class MeetingService:
         )
 
     def list_meetings(self) -> list[dict]:
-        """Read every meeting from PostgreSQL, falling back to `mock_data.MEETINGS`.
+        """Read every meeting from PostgreSQL, falling back to `demo_data.MEETINGS`.
 
         Fallback strategy: two situations land here — the table is reachable
         but empty (nothing seeded yet), or the database itself is unreachable
@@ -72,7 +72,7 @@ class MeetingService:
         return load_rows_with_fallback(
             query=lambda: self.db.query(Meeting).order_by(Meeting.starts_at.asc()).all(),
             to_dict=self._to_dict,
-            fallback=mock_data.MEETINGS,
+            fallback=demo_data.MEETINGS,
             logger=logger,
             label="meetings",
             db=self.db,

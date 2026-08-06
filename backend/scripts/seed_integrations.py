@@ -11,12 +11,12 @@ through the `Integration` ORM model. `IntegrationService` owns reads and
 sync-triggered writes (`status` / `SyncEvent`) but has no "create
 connection" path yet — that waits on OAuth. Integrations need a
 `user_id`, so this script also finds or creates a demo user matching
-`mock_data.USER`.
+`demo_data.USER`.
 
 This does not touch authentication or OAuth: `config` here holds only the
 display metadata (name/category/description/metrics/poweredBy) that the
 model has no dedicated columns for — no real tokens are stored or read.
-Providers match `mock_data.INTEGRATIONS` (Calendar, Gmail, Notion,
+Providers match `demo_data.INTEGRATIONS` (Calendar, Gmail, Notion,
 GoHighLevel, OpenAI, n8n).
 """
 

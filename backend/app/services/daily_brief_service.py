@@ -11,7 +11,7 @@ class DailyBriefService:
     """Reads and writes the `daily_briefs` table.
 
     This is the first service in Briefly that talks to PostgreSQL for real,
-    rather than reading `mock_data`. It is used by `OverviewService` for three
+    rather than reading `demo_data`. It is used by `OverviewService` for three
     fields (`summary`, `priorities`, `risks`) and by the standalone
     `GET /daily-brief/latest` endpoint, which exposes the raw table directly.
     """

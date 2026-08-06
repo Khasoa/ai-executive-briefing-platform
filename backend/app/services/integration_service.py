@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import Integration, SyncEvent
 from app.schemas.integrations import IntegrationsResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
 from app.services.mapping_utils import jsonb_or_default, relative_time_label, stringify_id
 
@@ -21,9 +21,9 @@ class IntegrationService:
     Phase 5 persisted `integrations`. The final production-readiness pass
     also persists `sync_events` (the Integrations page audit trail), with
     the same empty-table / `SQLAlchemyError` fallback to
-    `mock_data.SYNC_HISTORY`. `list_integrations()` remains the single
+    `demo_data.SYNC_HISTORY`. `list_integrations()` remains the single
     owner of connection state so other services (`AskService`) never read
-    `mock_data.INTEGRATIONS` directly.
+    `demo_data.INTEGRATIONS` directly.
     """
 
     def __init__(self, db: Session) -> None:
@@ -43,9 +43,9 @@ class IntegrationService:
 
         When the matched integration is a PostgreSQL row, this updates
         `status`/`last_sync_at` on that row and inserts a `SyncEvent`.
-        When the matched entry came from `mock_data` (fallback path), the
+        When the matched entry came from `demo_data` (fallback path), the
         pre-migration behaviour is preserved: mutate the in-memory
-        integration dict and prepend onto `mock_data.SYNC_HISTORY`.
+        integration dict and prepend onto `demo_data.SYNC_HISTORY`.
         """
         integrations = self.list_integrations()
         integration = next((i for i in integrations if i["id"] == integration_id), None)
@@ -69,7 +69,7 @@ class IntegrationService:
         integration["lastSyncLabel"] = "syncing now"
 
         if not persisted:
-            mock_data.SYNC_HISTORY.insert(
+            demo_data.SYNC_HISTORY.insert(
                 0,
                 {
                     "id": f"sync_{uuid4().hex[:8]}",
@@ -96,18 +96,18 @@ class IntegrationService:
         )
 
     def list_integrations(self) -> list[dict]:
-        """Read every integration from PostgreSQL, falling back to `mock_data.INTEGRATIONS`."""
+        """Read every integration from PostgreSQL, falling back to `demo_data.INTEGRATIONS`."""
         return load_rows_with_fallback(
             query=lambda: self.db.query(Integration).order_by(Integration.provider.asc()).all(),
             to_dict=self._to_dict,
-            fallback=mock_data.INTEGRATIONS,
+            fallback=demo_data.INTEGRATIONS,
             logger=logger,
             label="integrations",
             db=self.db,
         )
 
     def list_sync_history(self) -> list[dict]:
-        """Read sync audit rows from PostgreSQL, falling back to `mock_data.SYNC_HISTORY`."""
+        """Read sync audit rows from PostgreSQL, falling back to `demo_data.SYNC_HISTORY`."""
         return load_rows_with_fallback(
             query=lambda: (
                 self.db.query(SyncEvent)
@@ -117,7 +117,7 @@ class IntegrationService:
                 .all()
             ),
             to_dict=self._sync_event_to_dict,
-            fallback=mock_data.SYNC_HISTORY,
+            fallback=demo_data.SYNC_HISTORY,
             logger=logger,
             label="sync_events",
             db=self.db,
@@ -150,7 +150,7 @@ class IntegrationService:
             return True
         except SQLAlchemyError:
             logger.warning(
-                "Could not persist sync for %s — falling back to mock_data",
+                "Could not persist sync for %s — falling back to demo_data",
                 provider,
                 exc_info=True,
             )

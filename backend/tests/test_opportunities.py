@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import Opportunity
-from app.services import mock_data
+from app.services import demo_data
 from app.services.crm_service import CRMService
 
 client = TestClient(app)
@@ -98,14 +98,14 @@ def test_opportunities_are_returned_from_postgres_when_rows_exist(monkeypatch):
     assert data["summary"]["needingAttention"] == 1  # only the "high" risk one
 
 
-def test_opportunities_fall_back_to_mock_data_when_table_is_empty(monkeypatch):
+def test_opportunities_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     response = client.get("/crm")
     assert response.status_code == 200
     data = response.json()
 
-    assert {o["id"] for o in data["opportunities"]} == {o["id"] for o in mock_data.OPPORTUNITIES}
+    assert {o["id"] for o in data["opportunities"]} == {o["id"] for o in demo_data.OPPORTUNITIES}
 
 
 def test_opportunities_fall_back_when_the_database_is_unreachable(monkeypatch):
@@ -115,7 +115,7 @@ def test_opportunities_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {o["id"] for o in data["opportunities"]} == {o["id"] for o in mock_data.OPPORTUNITIES}
+    assert {o["id"] for o in data["opportunities"]} == {o["id"] for o in demo_data.OPPORTUNITIES}
 
 
 def test_get_opportunity_reads_from_postgres_when_rows_exist(monkeypatch):
@@ -132,7 +132,7 @@ def test_get_opportunity_reads_from_postgres_when_rows_exist(monkeypatch):
 def test_get_opportunity_falls_back_to_mock_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
-    mock_opportunity = mock_data.OPPORTUNITIES[0]
+    mock_opportunity = demo_data.OPPORTUNITIES[0]
     opportunity = CRMService(db=Session()).get_opportunity(mock_opportunity["id"])
     assert opportunity.company == mock_opportunity["company"]
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import Integration, SyncEvent
-from app.services import mock_data
+from app.services import demo_data
 
 client = TestClient(app)
 
@@ -42,7 +42,7 @@ def _fake_sync_event_row(integration: Integration, **overrides) -> SyncEvent:
         integration_id=integration.id,
         event="Database-backed sync completed",
         status="success",
-        detail="Came from PostgreSQL, not mock_data.",
+        detail="Came from PostgreSQL, not demo_data.",
         occurred_at=datetime.now(timezone.utc) - timedelta(minutes=3),
     )
     defaults.update(overrides)
@@ -139,16 +139,16 @@ def test_integrations_are_returned_from_postgres_when_rows_exist(monkeypatch):
     assert first["lastSyncLabel"].endswith("ago")
 
 
-def test_integrations_fall_back_to_mock_data_when_table_is_empty(monkeypatch):
+def test_integrations_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     _patch_session(monkeypatch, integrations=[], sync_events=[])
 
     response = client.get("/integrations")
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in mock_data.INTEGRATIONS}
-    assert data["totalCount"] == len(mock_data.INTEGRATIONS)
-    assert data["syncHistory"] == mock_data.SYNC_HISTORY
+    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in demo_data.INTEGRATIONS}
+    assert data["totalCount"] == len(demo_data.INTEGRATIONS)
+    assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 
 def test_integrations_fall_back_when_the_database_is_unreachable(monkeypatch):
@@ -158,8 +158,8 @@ def test_integrations_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in mock_data.INTEGRATIONS}
-    assert data["syncHistory"] == mock_data.SYNC_HISTORY
+    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in demo_data.INTEGRATIONS}
+    assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 
 def test_sync_history_is_returned_from_postgres_when_rows_exist(monkeypatch):
@@ -174,7 +174,7 @@ def test_sync_history_is_returned_from_postgres_when_rows_exist(monkeypatch):
     assert len(data["syncHistory"]) == 1
     assert data["syncHistory"][0]["id"] == str(event.id)
     assert data["syncHistory"][0]["integrationId"] == "gmail"
-    assert data["syncHistory"][0]["detail"] == "Came from PostgreSQL, not mock_data."
+    assert data["syncHistory"][0]["detail"] == "Came from PostgreSQL, not demo_data."
 
 
 def test_sync_persists_event_against_database_backed_integrations(monkeypatch):

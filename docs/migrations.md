@@ -4,7 +4,7 @@
 
 Railway's `alembic_version` was stamped `001` while the live tables still matched the pre-Briefly **Atlas** shape (`crm_deals`, `research_items`, `tasks`, `meetings.time`, `emails.summary`, `daily_briefs.greeting`, users without `full_name` / `timezone` / `preferences`).
 
-Revision `001` in this repository describes the **Briefly** schema. It was stamped on Railway without having been applied against that Atlas database. That is why services fell back to `mock_data` despite "sharing" revision `001`.
+Revision `001` in this repository describes the **Briefly** schema. It was stamped on Railway without having been applied against that Atlas database. That is why services fell back to `demo_data` despite "sharing" revision `001`.
 
 Revision history was **not** rewritten. Forward revisions repair the drift.
 
@@ -53,14 +53,10 @@ Data safety rules in `003`:
 ## After upgrading
 
 ```bash
-python scripts/seed_daily_brief.py
-python scripts/seed_meetings.py
-python scripts/seed_emails.py
-python scripts/seed_opportunities.py
-python scripts/seed_integrations.py
-python scripts/seed_sync_events.py
-python scripts/seed_morning_brief.py
+python3 scripts/seed.py
 ```
+
+That entry point runs every domain seed in dependency order. Individual `scripts/seed_*.py` modules remain available for modular re-runs.
 
 ## Model ↔ migration parity
 

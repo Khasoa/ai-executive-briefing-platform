@@ -1,6 +1,6 @@
 """DailyBrief — Phase 1 of the PostgreSQL migration.
 
-The first slice of the Morning Brief moved off `mock_data` and onto a real
+The first slice of the Morning Brief moved off `demo_data` and onto a real
 table. Has no relationships to other models (yet) — it stands alone.
 """
 
@@ -16,7 +16,7 @@ from app.db.base import Base
 
 class DailyBrief(Base):
     """Phase 1 of the PostgreSQL migration: the first slice of the Morning Brief
-    moved off `mock_data` and onto a real table.
+    moved off `demo_data` and onto a real table.
 
     Only `summary`, `priorities` and `risks` are read today — see
     `OverviewService` for how those three fields are combined with curated data
@@ -27,7 +27,7 @@ class DailyBrief(Base):
     `priorities` and `risks` are stored as JSONB shaped exactly like
     `PrioritySchema` / `RiskSchema` (see `app/schemas/common.py`), so a row
     read back from the database validates against the same response schema
-    the API already returns from `mock_data` — no separate mapping needed.
+    the API already returns from `demo_data` — no separate mapping needed.
     """
 
     __tablename__ = "daily_briefs"

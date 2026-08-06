@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.schemas.workspace import WorkspaceResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.crm_service import CRMService
 from app.services.inbox_service import InboxService
 from app.services.meeting_service import MeetingService
@@ -12,7 +12,7 @@ class WorkspaceService:
     """Lightweight payload for the application shell — identity and nav counts.
 
     Badge counts go through `InboxService`, `MeetingService` and
-    `CRMService` rather than reading `mock_data` directly, so the shell
+    `CRMService` rather than reading `demo_data` directly, so the shell
     always reflects whichever source (database or mock) those services are
     actually serving. Brief freshness goes through
     `MorningBriefService.get_brief_meta()` for the same reason — the shell
@@ -28,7 +28,7 @@ class WorkspaceService:
         opportunities = CRMService(self.db).list_opportunities()
 
         return WorkspaceResponse(
-            user=mock_data.USER,
+            user=demo_data.USER,
             brief=MorningBriefService(self.db).get_brief_meta(),
             badges={
                 "inbox": sum(1 for email in emails if email["unread"]),

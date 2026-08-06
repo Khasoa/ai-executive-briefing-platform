@@ -15,7 +15,7 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
                             │ REST (JSON, camelCase)
 ┌───────────────────────────▼──────────────────────────────────┐
 │                       FastAPI Backend                        │
-│   Routes ──▶ Services ──▶ PostgreSQL (+ mock_data fallback)  │
+│   Routes ──▶ Services ──▶ PostgreSQL (+ demo_data fallback)  │
 │                   │                                          │
 │                   └──▶ Integrations (future, read-only)      │
 └───────────────────────────┬──────────────────────────────────┘
@@ -76,7 +76,7 @@ The Morning Brief adds a serif face for long-form passages and a print styleshee
 | `IntegrationService` | `integrations`, `sync_events` |
 | `SettingsService` | Preferences UI state (curated until auth) |
 
-Persistence-backed services read PostgreSQL first and fall back to `mock_data.py` when a table is empty or unreachable (`db_fallback.py`). Cross-domain reads never bypass the owning service. Migration history: [migrations.md](./migrations.md).
+Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` when a table is empty or unreachable (`db_fallback.py`). Cross-domain reads never bypass the owning service. Migration history: [migrations.md](./migrations.md).
 
 **Schemas** (`app/schemas/`) define the API contract only — separate from ORM models. `common.py` holds the shared vocabulary — urgency, severity, confidence, sources and citations.
 

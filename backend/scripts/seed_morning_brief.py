@@ -16,8 +16,8 @@ in `backend/README.md`): it looks up the demo user via
 re-exports for the other scripts), creates today's `MorningBrief` if one
 doesn't exist yet, and never touches `BriefAction` rows that already exist.
 Re-running this script is therefore always safe: it refreshes today's report
-content and, the first time, seeds the checklist from `mock_data
-.ACTION_CHECKLIST` — after that, it leaves checklist progress alone.
+content and, the first time, seeds the checklist from
+`demo_data.ACTION_CHECKLIST` — after that, it leaves checklist progress alone.
 """
 
 import sys

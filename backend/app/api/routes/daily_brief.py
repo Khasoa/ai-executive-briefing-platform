@@ -12,7 +12,7 @@ router = APIRouter(prefix="/daily-brief", tags=["daily-brief"])
 def get_latest_daily_brief(db: Session = Depends(get_db)) -> DailyBriefSchema:
     """Direct read of the newest row in `daily_briefs`.
 
-    Unlike `OverviewService`, this endpoint does not fall back to `mock_data`:
+    Unlike `OverviewService`, this endpoint does not fall back to `demo_data`:
     its entire purpose is to reflect what is actually in PostgreSQL, so a
     missing brief (or an unreachable database) should surface as an error
     rather than be silently hidden.

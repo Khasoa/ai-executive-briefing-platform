@@ -73,11 +73,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Configure DATABASE_URL, then:
 alembic upgrade head
-# Optional demo data (idempotent): see backend/README.md
+python3 scripts/seed.py   # optional, idempotent demo data
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md).
+API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md). Backend onboarding: [backend/README.md](backend/README.md).
 
 ### Frontend
 
@@ -94,10 +94,12 @@ No page holds its own copy of server data — every view is rendered from an API
 ### Checks
 
 ```bash
-npm run lint              # oxlint
+npm run lint              # oxlint (project frontend linter)
 npm run build             # production bundle
 cd backend && pytest -q   # API contract and product invariants
 ```
+
+Frontend lint uses **oxlint** (Oxc). ESLint is not configured in this repository.
 
 The backend suite covers every endpoint, both mutation paths, and the invariants that define the product: no endpoint acts on the executive's behalf, and automatic actions cannot be enabled.
 

@@ -28,7 +28,7 @@ app/
 └── integrations/     # External API clients (future)
 ```
 
-**Request flow:** Route → Service → PostgreSQL (with `mock_data` fallback) → future integration modules
+**Request flow:** Route → Service → PostgreSQL (with `demo_data` fallback) → future integration modules
 
 ## Endpoints
 
@@ -120,18 +120,14 @@ Migration history, Atlas→Briefly upgrade path, and data-safety rules: [docs/mi
 ### Seed everything (idempotent)
 
 ```bash
-python scripts/seed_daily_brief.py
-python scripts/seed_meetings.py
-python scripts/seed_emails.py
-python scripts/seed_opportunities.py
-python scripts/seed_integrations.py
-python scripts/seed_sync_events.py   # requires integrations first
-python scripts/seed_morning_brief.py
+python3 scripts/seed.py
 ```
+
+That single entry point runs every domain seed in dependency order (daily brief → meetings → emails → opportunities → integrations → sync events → morning brief). Individual `scripts/seed_*.py` modules remain available for modular re-runs.
 
 Shared helpers live in `scripts/seed_common.py` (`get_or_create_demo_user`, `seed_idempotently`). Every seed is safe to re-run.
 
-Without a database (or when a table is empty / unreachable), services fall back to `mock_data.py` so the API stays usable.
+Without a database (or when a table is empty / unreachable), services fall back to `demo_data.py` so the API stays usable.
 
 ### Run
 
@@ -148,7 +144,7 @@ Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 2. Environment: `DATABASE_URL`, `CORS_ORIGINS`, `ENVIRONMENT=production`, `DEBUG=false`.
 3. Deploy hook: `alembic upgrade head` (applies `001`→`002`→`003`).
 4. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. One-time seed (or CI step) using the scripts above.
+5. One-time seed (or CI step): `python3 scripts/seed.py`
 
 If an environment was previously stamped `001` on Atlas tables, `003` aligns it without rewriting revision history — see [docs/migrations.md](../docs/migrations.md).
 

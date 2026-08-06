@@ -12,7 +12,7 @@ ORM model rather than through a service method, because `InboxService` is
 intentionally read-only: it only ever *retrieves* emails for the API (see
 `InboxService.list_emails()`), so there is no write path to route through.
 Emails need a `user_id`, so this script also finds or creates a demo user
-matching `mock_data.USER`.
+matching `demo_data.USER`.
 """
 
 import sys
@@ -30,7 +30,7 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.models import Email  # noqa: E402
 from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
-# Matches mock_data.USER so seeded emails sit consistently alongside the
+# Matches demo_data.USER so seeded emails sit consistently alongside the
 # rest of the mocked morning brief.
 ATHENS = timezone(timedelta(hours=3))
 

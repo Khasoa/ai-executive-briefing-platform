@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import Email
-from app.services import mock_data
+from app.services import demo_data
 from app.services.inbox_service import InboxService
 
 client = TestClient(app)
@@ -88,24 +88,24 @@ def test_emails_are_returned_from_postgres_when_rows_exist(monkeypatch):
     assert first["threadCount"] == 3
     assert first["unread"] is True
 
-    # Category counts reflect the database-backed list, not mock_data.
+    # Category counts reflect the database-backed list, not demo_data.
     categories_by_id = {c["id"]: c["count"] for c in data["categories"]}
     assert categories_by_id["needs-reply"] == 1
     assert categories_by_id["high-priority"] == 1
     assert categories_by_id["waiting"] == 0
 
 
-def test_emails_fall_back_to_mock_data_when_table_is_empty(monkeypatch):
+def test_emails_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     response = client.get("/inbox")
     assert response.status_code == 200
     data = response.json()
 
-    assert {e["id"] for e in data["emails"]} == {e["id"] for e in mock_data.EMAILS}
+    assert {e["id"] for e in data["emails"]} == {e["id"] for e in demo_data.EMAILS}
     # Summary stats are independent aggregate figures, not derived from the
-    # curated list, so they stay sourced from mock_data either way.
-    assert data["summary"] == mock_data.INBOX_SUMMARY
+    # curated list, so they stay sourced from demo_data either way.
+    assert data["summary"] == demo_data.INBOX_SUMMARY
 
 
 def test_emails_fall_back_when_the_database_is_unreachable(monkeypatch):
@@ -115,7 +115,7 @@ def test_emails_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {e["id"] for e in data["emails"]} == {e["id"] for e in mock_data.EMAILS}
+    assert {e["id"] for e in data["emails"]} == {e["id"] for e in demo_data.EMAILS}
 
 
 def test_get_email_reads_from_postgres_when_rows_exist(monkeypatch):
@@ -132,6 +132,6 @@ def test_get_email_reads_from_postgres_when_rows_exist(monkeypatch):
 def test_get_email_falls_back_to_mock_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
-    mock_email = mock_data.EMAILS[0]
+    mock_email = demo_data.EMAILS[0]
     email = InboxService(db=Session()).get_email(mock_email["id"])
     assert email.subject == mock_email["subject"]

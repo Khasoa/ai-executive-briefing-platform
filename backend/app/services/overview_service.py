@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.schemas.overview import OverviewResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.daily_brief_service import DailyBriefService
 from app.services.db_fallback import read_with_fallback
 from app.services.meeting_service import MeetingService
@@ -18,7 +18,7 @@ class OverviewService:
     Phase 1 of the PostgreSQL migration lives here: `summary`, `priorities`
     and `risks` are read from the `daily_briefs` table when a row exists.
     Every other section — meetings, KPIs, activity, focus, recommended
-    actions — still comes from `mock_data`.
+    actions — still comes from `demo_data`.
 
     This is deliberately partial. Moving one section of the brief at a time
     keeps the app fully functional at every step, lets the new table prove
@@ -34,23 +34,23 @@ class OverviewService:
         summary, priorities, risks = self._executive_summary_source()
 
         return OverviewResponse(
-            user=mock_data.USER,
+            user=demo_data.USER,
             brief=MorningBriefService(self.db).get_brief_meta(),
             executiveSummary={
                 "summary": summary,
                 "priorities": priorities,
                 "risks": risks,
                 "meetingsToPrepare": self._meetings_to_prepare(),
-                "clientsNeedingAttention": mock_data.CLIENTS_NEEDING_ATTENTION,
+                "clientsNeedingAttention": demo_data.CLIENTS_NEEDING_ATTENTION,
                 "recommendedActions": self._recommended_actions(),
             },
-            kpis=mock_data.KPIS,
-            activity=mock_data.ACTIVITY,
-            focus=mock_data.TODAYS_FOCUS,
+            kpis=demo_data.KPIS,
+            activity=demo_data.ACTIVITY,
+            focus=demo_data.TODAYS_FOCUS,
         )
 
     def _executive_summary_source(self) -> tuple[str, list, list]:
-        """Read `summary`/`priorities`/`risks` from PostgreSQL, falling back to `mock_data`.
+        """Read `summary`/`priorities`/`risks` from PostgreSQL, falling back to `demo_data`.
 
         How SQLAlchemy retrieves it: `DailyBriefService.get_latest_brief()`
         runs `SELECT * FROM daily_briefs ORDER BY generated_at DESC LIMIT 1`
@@ -66,7 +66,7 @@ class OverviewService:
         Both are caught the same way, because from the dashboard's point of
         view they mean the same thing: there is nothing trustworthy in
         Postgres right now. Rather than let either case turn into a broken
-        Overview page, we log a warning and use the curated `mock_data`
+        Overview page, we log a warning and use the curated `demo_data`
         values instead, so the rest of the dashboard is unaffected. Once
         `daily_briefs` is reliably populated in production, this fallback
         should rarely trigger — but it means a bad migration or a dropped
@@ -88,12 +88,12 @@ class OverviewService:
         )
 
         if brief is None:
-            return mock_data.EXECUTIVE_SUMMARY_TEXT, mock_data.PRIORITIES, mock_data.RISKS
+            return demo_data.EXECUTIVE_SUMMARY_TEXT, demo_data.PRIORITIES, demo_data.RISKS
 
         return brief.summary, brief.priorities, brief.risks
 
     def _meetings_to_prepare(self) -> list[dict]:
-        # Goes through `MeetingService` rather than `mock_data.MEETINGS`
+        # Goes through `MeetingService` rather than `demo_data.MEETINGS`
         # directly, so this section reflects real meetings the moment
         # `meetings` has rows — Phase 2's migration otherwise had no effect
         # on the Overview page at all.
@@ -116,5 +116,5 @@ class OverviewService:
                 "label": item["title"],
                 "rationale": item["rationale"],
             }
-            for item in mock_data.TODAYS_FOCUS
+            for item in demo_data.TODAYS_FOCUS
         ]

@@ -4,7 +4,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.schemas.ask import AskReportResponse, AskWorkspaceResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.integration_service import IntegrationService
 
 
@@ -15,7 +15,7 @@ class AskService:
         self.db = db
 
     def get_workspace(self) -> AskWorkspaceResponse:
-        # Goes through `IntegrationService` rather than `mock_data.INTEGRATIONS`
+        # Goes through `IntegrationService` rather than `demo_data.INTEGRATIONS`
         # directly, so `connectedSources` reflects real connection state the
         # moment `integrations` has rows, matching every other cross-service
         # read in this refactor.
@@ -26,8 +26,8 @@ class AskService:
             if integration["status"] in ("connected", "syncing")
         ]
         return AskWorkspaceResponse(
-            suggestions=mock_data.ASK_SUGGESTIONS,
-            recent=mock_data.ASK_RECENT,
+            suggestions=demo_data.ASK_SUGGESTIONS,
+            recent=demo_data.ASK_RECENT,
             connectedSources=connected,
         )
 
@@ -43,11 +43,11 @@ class AskService:
     @staticmethod
     def _match(question: str) -> dict:
         """Exact match first, then a loose keyword match, then the generic report."""
-        if question in mock_data.ASK_REPORTS:
-            return mock_data.ASK_REPORTS[question]
+        if question in demo_data.ASK_REPORTS:
+            return demo_data.ASK_REPORTS[question]
 
         normalised = question.lower().strip().rstrip("?.")
-        for known, report in mock_data.ASK_REPORTS.items():
+        for known, report in demo_data.ASK_REPORTS.items():
             if normalised in known.lower() or known.lower().rstrip("?.") in normalised:
                 return report
 
@@ -68,6 +68,6 @@ class AskService:
         }
         for keyword, known in keywords.items():
             if keyword in normalised:
-                return mock_data.ASK_REPORTS[known]
+                return demo_data.ASK_REPORTS[known]
 
-        return mock_data.DEFAULT_ASK_REPORT
+        return demo_data.DEFAULT_ASK_REPORT

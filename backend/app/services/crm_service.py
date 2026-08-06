@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Opportunity
 from app.schemas.crm import CRMResponse, OpportunitySchema
-from app.services import mock_data
+from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
 from app.services.mapping_utils import jsonb_or_default, stringify_id
 
@@ -20,14 +20,14 @@ class CRMService:
 
     Phase 4 of the PostgreSQL migration: opportunities are read from the
     `opportunities` table when rows exist there, falling back to
-    `mock_data.OPPORTUNITIES` otherwise — including when the database itself
+    `demo_data.OPPORTUNITIES` otherwise — including when the database itself
     is unreachable. Same fallback pattern as `MeetingService` and
     `InboxService`; see `list_opportunities()` for the mechanics.
 
     `list_opportunities()` is public on purpose: it is the one place that
     knows how to load opportunities, so any other service that needs
     pipeline data (`WorkspaceService`) calls it instead of reading
-    `mock_data.OPPORTUNITIES` directly.
+    `demo_data.OPPORTUNITIES` directly.
     """
 
     def __init__(self, db: Session) -> None:
@@ -64,7 +64,7 @@ class CRMService:
         )
 
     def list_opportunities(self) -> list[dict]:
-        """Read every opportunity from PostgreSQL, falling back to `mock_data.OPPORTUNITIES`.
+        """Read every opportunity from PostgreSQL, falling back to `demo_data.OPPORTUNITIES`.
 
         Fallback strategy: the same two situations as `MeetingService` and
         `InboxService` land here — the table is reachable but empty (nothing
@@ -81,7 +81,7 @@ class CRMService:
         return load_rows_with_fallback(
             query=lambda: self.db.query(Opportunity).order_by(Opportunity.close_date.asc()).all(),
             to_dict=self._to_dict,
-            fallback=mock_data.OPPORTUNITIES,
+            fallback=demo_data.OPPORTUNITIES,
             logger=logger,
             label="opportunities",
             db=self.db,

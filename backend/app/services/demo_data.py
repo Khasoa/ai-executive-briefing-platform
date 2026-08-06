@@ -1,4 +1,9 @@
-"""In-memory dataset backing the Briefly API.
+"""Demo / fallback dataset for the Briefly API.
+
+Used only as: (1) empty-table and SQLAlchemyError fallback for
+persistence-backed services, (2) Morning Brief generator content until
+OpenAI is wired, and (3) still-curated surfaces (Ask reports, Settings,
+Overview KPIs/activity/focus).
 
 Every value here mirrors the shape a real integration (Gmail, Google Calendar,
 GoHighLevel, Notion) would return once wired up, so services can swap the source
@@ -9,11 +14,11 @@ BRIEF_DATE = "Tuesday, August 4, 2026"
 
 USER = {
     "name": "Lydia",
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
-    "avatar": "LR",
+    "avatar": "LK",
     "timezone": "Europe/Athens",
 }
 
@@ -1625,13 +1630,13 @@ SYNC_HISTORY = [
 ]
 
 SETTINGS_PROFILE = {
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
     "phone": "+30 210 555 0148",
     "timezone": "Europe/Athens (GMT+3)",
-    "avatar": "LR",
+    "avatar": "LK",
 }
 
 SETTINGS_PREFERENCES = {

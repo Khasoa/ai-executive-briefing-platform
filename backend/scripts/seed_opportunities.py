@@ -12,7 +12,7 @@ risk_level/last_interaction/ai_summary/recommended_action/signals — see
 `CRMService` is intentionally read-only: it only ever *retrieves* the
 pipeline for the API (see `CRMService.list_opportunities()`), so there is
 no write path to route through. Opportunities need a `user_id`, so this
-script also finds or creates a demo user matching `mock_data.USER`.
+script also finds or creates a demo user matching `demo_data.USER`.
 """
 
 import sys
@@ -116,7 +116,7 @@ OPPORTUNITIES = [
         stage="Partnership",
         value=150_000,
         probability=40,
-        owner="Lydia Reyes",
+        owner="Lydia K.",
         close_date=date(2026, 11, 3),
         risk_level="medium",
         last_interaction={

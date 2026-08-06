@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import Meeting
-from app.services import mock_data
+from app.services import demo_data
 
 client = TestClient(app)
 
@@ -113,15 +113,15 @@ def test_meetings_are_returned_from_postgres_when_rows_exist(monkeypatch):
     assert first["risks"][0]["title"] == "Risk"
 
 
-def test_meetings_fall_back_to_mock_data_when_table_is_empty(monkeypatch):
+def test_meetings_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     response = client.get("/meetings")
     assert response.status_code == 200
     data = response.json()
 
-    assert data["meetingCount"] == len(mock_data.MEETINGS)
-    assert {m["id"] for m in data["meetings"]} == {m["id"] for m in mock_data.MEETINGS}
+    assert data["meetingCount"] == len(demo_data.MEETINGS)
+    assert {m["id"] for m in data["meetings"]} == {m["id"] for m in demo_data.MEETINGS}
 
 
 def test_meetings_fall_back_when_the_database_is_unreachable(monkeypatch):
@@ -131,8 +131,8 @@ def test_meetings_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert data["meetingCount"] == len(mock_data.MEETINGS)
-    assert {m["id"] for m in data["meetings"]} == {m["id"] for m in mock_data.MEETINGS}
+    assert data["meetingCount"] == len(demo_data.MEETINGS)
+    assert {m["id"] for m in data["meetings"]} == {m["id"] for m in demo_data.MEETINGS}
 
 
 def test_single_meeting_endpoint_reads_from_postgres_when_rows_exist(monkeypatch):
@@ -144,7 +144,7 @@ def test_single_meeting_endpoint_reads_from_postgres_when_rows_exist(monkeypatch
     assert response.json()["title"] == "Database Sync"
 
 
-def test_single_meeting_endpoint_404s_against_mock_data_when_id_unknown(monkeypatch):
+def test_single_meeting_endpoint_404s_against_demo_data_when_id_unknown(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     response = client.get("/meetings/not-a-real-id")

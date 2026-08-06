@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BriefAction, MorningBrief
 from app.schemas.morning_brief import ChecklistItemSchema, MorningBriefResponse
-from app.services import mock_data
+from app.services import demo_data
 from app.services.db_fallback import read_with_fallback
 from app.services.demo_user import get_or_create_demo_user
 from app.services.inbox_service import InboxService
@@ -36,12 +36,12 @@ class MorningBriefService:
     Fallback strategy, extending the pattern from `MeetingService`,
     `InboxService`, `CRMService` and `IntegrationService`: if PostgreSQL has
     no row for today (empty) or is unreachable, this generates the brief
-    from `mock_data` and tries to persist it, so the *next* request finds a
+    from `demo_data` and tries to persist it, so the *next* request finds a
     real row instead of regenerating every time. If that persistence
     attempt also fails — most likely because `morning_briefs`/
     `brief_actions` do not exist in the connected database yet — every
     method here falls all the way back to the exact pre-migration
-    behaviour (`_mock_only_response()`, mutating `mock_data.ACTION_CHECKLIST`
+    behaviour (`_mock_only_response()`, mutating `demo_data.ACTION_CHECKLIST`
     directly), so the feature keeps working today and starts persisting
     for real the moment those tables are migrated.
     """
@@ -60,7 +60,7 @@ class MorningBriefService:
 
         Read-only against today's row — unlike `get_brief()`, this never
         generate-and-persists, so loading the shell does not create a brief
-        as a side effect. Falls back to `mock_data.BRIEF_META` when no row
+        as a side effect. Falls back to `demo_data.BRIEF_META` when no row
         exists or PostgreSQL is unreachable.
         """
         brief = read_with_fallback(
@@ -72,7 +72,7 @@ class MorningBriefService:
             log_empty=False,
         )
         if brief is None:
-            return mock_data.BRIEF_META
+            return demo_data.BRIEF_META
         return {
             "id": stringify_id(brief.id),
             "date": self._format_brief_date(brief.brief_date),
@@ -97,9 +97,9 @@ class MorningBriefService:
         brief, actions = self._generate_and_persist()
         if brief is None:
             # Persistence isn't available — fall back to the pre-migration
-            # behaviour of refreshing `mock_data.BRIEF_META` in place.
-            mock_data.BRIEF_META["generatedAt"] = datetime.now(timezone.utc).isoformat()
-            mock_data.BRIEF_META["generatedLabel"] = "just now"
+            # behaviour of refreshing `demo_data.BRIEF_META` in place.
+            demo_data.BRIEF_META["generatedAt"] = datetime.now(timezone.utc).isoformat()
+            demo_data.BRIEF_META["generatedLabel"] = "just now"
             return self._mock_only_response()
         return self._to_response(brief, actions)
 
@@ -114,10 +114,10 @@ class MorningBriefService:
 
         # No persisted match — either this id was never written to
         # PostgreSQL (persistence isn't available yet) or it is one of the
-        # stable `mock_data.ACTION_CHECKLIST` ids `_mock_only_response()`
+        # stable `demo_data.ACTION_CHECKLIST` ids `_mock_only_response()`
         # hands out in that situation. Mutating it in place matches the
         # pre-migration behaviour exactly.
-        for item in mock_data.ACTION_CHECKLIST:
+        for item in demo_data.ACTION_CHECKLIST:
             if item["id"] == item_id:
                 item["done"] = done
                 return ChecklistItemSchema(**item)
@@ -136,7 +136,7 @@ class MorningBriefService:
         migrated services: no row for today yet (empty), or the database is
         unreachable. Either way, `brief` comes back `None` and this method
         immediately tries to generate and persist today's brief from
-        `mock_data` instead of just returning mock content — the one
+        `demo_data` instead of just returning mock content — the one
         difference from a normal read-fallback, so the next request has a
         real row to read.
         """
@@ -175,7 +175,7 @@ class MorningBriefService:
             return self.db.query(BriefAction).filter(BriefAction.id == action_id).first()
         except SQLAlchemyError:
             logger.warning(
-                "Could not read brief_actions — falling back to mock_data", exc_info=True
+                "Could not read brief_actions — falling back to demo_data", exc_info=True
             )
             return None
 
@@ -186,7 +186,7 @@ class MorningBriefService:
             return self._write_brief(self._generated_content())
         except SQLAlchemyError:
             logger.warning(
-                "Could not persist a generated morning brief — falling back to mock_data",
+                "Could not persist a generated morning brief — falling back to demo_data",
                 exc_info=True,
             )
             self.db.rollback()
@@ -242,18 +242,18 @@ class MorningBriefService:
         straight assignment with no transformation.
         """
         return {
-            "headline": mock_data.BRIEF_META["headline"],
-            "executive_summary": mock_data.EXECUTIVE_SUMMARY_TEXT,
-            "confidence": mock_data.BRIEF_META["confidence"],
-            "sources": mock_data.BRIEF_META["sources"],
+            "headline": demo_data.BRIEF_META["headline"],
+            "executive_summary": demo_data.EXECUTIVE_SUMMARY_TEXT,
+            "confidence": demo_data.BRIEF_META["confidence"],
+            "sources": demo_data.BRIEF_META["sources"],
             "sections": {
-                "priorities": mock_data.PRIORITIES,
-                "risks": mock_data.RISKS,
-                "clients": mock_data.CLIENTS_NEEDING_ATTENTION,
-                "focus": mock_data.SUGGESTED_FOCUS,
-                "delegation": mock_data.RECOMMENDED_DELEGATION,
+                "priorities": demo_data.PRIORITIES,
+                "risks": demo_data.RISKS,
+                "clients": demo_data.CLIENTS_NEEDING_ATTENTION,
+                "focus": demo_data.SUGGESTED_FOCUS,
+                "delegation": demo_data.RECOMMENDED_DELEGATION,
             },
-            "closing": mock_data.CLOSING_ANSWER,
+            "closing": demo_data.CLOSING_ANSWER,
             "checklist": [
                 {
                     "label": item["label"],
@@ -261,7 +261,7 @@ class MorningBriefService:
                     "due": item["due"],
                     "done": item["done"],
                 }
-                for item in mock_data.ACTION_CHECKLIST
+                for item in demo_data.ACTION_CHECKLIST
             ],
         }
 
@@ -280,7 +280,7 @@ class MorningBriefService:
                 "sources": brief.sources,
                 "headline": brief.headline,
             },
-            preparedFor=mock_data.USER,
+            preparedFor=demo_data.USER,
             executiveSummary=brief.executive_summary,
             topPriorities=sections.get("priorities", []),
             criticalRisks=sections.get("risks", []),
@@ -296,7 +296,7 @@ class MorningBriefService:
     @staticmethod
     def _format_brief_date(brief_date: date) -> str:
         # Manual formatting (not `%-d`) to keep the day-of-month without a
-        # leading zero on every platform, matching `mock_data.BRIEF_DATE`.
+        # leading zero on every platform, matching `demo_data.BRIEF_DATE`.
         return f"{brief_date.strftime('%A, %B')} {brief_date.day}, {brief_date.year}"
 
     @staticmethod
@@ -310,7 +310,7 @@ class MorningBriefService:
         )
 
     def _mock_only_response(self) -> MorningBriefResponse:
-        """The pre-migration behaviour: every section straight from `mock_data`.
+        """The pre-migration behaviour: every section straight from `demo_data`.
 
         Used when PostgreSQL has nothing trustworthy to read *and* a freshly
         generated brief could not be persisted either — most likely because
@@ -319,22 +319,22 @@ class MorningBriefService:
         before this phase until those tables are migrated.
         """
         return MorningBriefResponse(
-            meta=mock_data.BRIEF_META,
-            preparedFor=mock_data.USER,
-            executiveSummary=mock_data.EXECUTIVE_SUMMARY_TEXT,
-            topPriorities=mock_data.PRIORITIES,
-            criticalRisks=mock_data.RISKS,
+            meta=demo_data.BRIEF_META,
+            preparedFor=demo_data.USER,
+            executiveSummary=demo_data.EXECUTIVE_SUMMARY_TEXT,
+            topPriorities=demo_data.PRIORITIES,
+            criticalRisks=demo_data.RISKS,
             meetings=self._meetings(),
-            clientsNeedingAttention=mock_data.CLIENTS_NEEDING_ATTENTION,
+            clientsNeedingAttention=demo_data.CLIENTS_NEEDING_ATTENTION,
             importantEmails=self._important_emails(),
-            suggestedFocus=mock_data.SUGGESTED_FOCUS,
-            recommendedDelegation=mock_data.RECOMMENDED_DELEGATION,
-            actionChecklist=mock_data.ACTION_CHECKLIST,
-            closing=mock_data.CLOSING_ANSWER,
+            suggestedFocus=demo_data.SUGGESTED_FOCUS,
+            recommendedDelegation=demo_data.RECOMMENDED_DELEGATION,
+            actionChecklist=demo_data.ACTION_CHECKLIST,
+            closing=demo_data.CLOSING_ANSWER,
         )
 
     def _meetings(self) -> list[dict]:
-        # Goes through `MeetingService` rather than `mock_data.MEETINGS`
+        # Goes through `MeetingService` rather than `demo_data.MEETINGS`
         # directly, so the brief reflects real meetings the moment
         # `meetings` has rows, matching what `OverviewService` already does.
         return [
@@ -350,7 +350,7 @@ class MorningBriefService:
         ]
 
     def _important_emails(self) -> list[dict]:
-        # Goes through `InboxService` rather than `mock_data.EMAILS`
+        # Goes through `InboxService` rather than `demo_data.EMAILS`
         # directly, for the same reason as `_meetings()` above.
         emails = InboxService(self.db).list_emails()
         by_id = {email["id"]: email for email in emails}

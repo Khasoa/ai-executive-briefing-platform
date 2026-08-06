@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import BriefAction, MorningBrief, User
-from app.services import mock_data
+from app.services import demo_data
 
 client = TestClient(app)
 
@@ -42,7 +42,7 @@ def _fake_brief_row(**overrides) -> MorningBrief:
                     "id": "db_pri_1",
                     "rank": 1,
                     "title": "Database-sourced priority",
-                    "detail": "Came from PostgreSQL, not mock_data.",
+                    "detail": "Came from PostgreSQL, not demo_data.",
                     "urgency": "high",
                     "owner": "Lydia",
                     "source": "Notion",
@@ -52,7 +52,7 @@ def _fake_brief_row(**overrides) -> MorningBrief:
                 {
                     "id": "db_risk_1",
                     "title": "Database-sourced risk",
-                    "detail": "Came from PostgreSQL, not mock_data.",
+                    "detail": "Came from PostgreSQL, not demo_data.",
                     "severity": "medium",
                     "impact": "Test impact",
                     "mitigation": "Test mitigation",
@@ -207,14 +207,14 @@ def test_morning_brief_falls_back_and_persists_when_none_exists(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    # Served from mock_data...
-    assert data["executiveSummary"] == mock_data.EXECUTIVE_SUMMARY_TEXT
-    assert data["meta"]["headline"] == mock_data.BRIEF_META["headline"]
+    # Served from demo_data...
+    assert data["executiveSummary"] == demo_data.EXECUTIVE_SUMMARY_TEXT
+    assert data["meta"]["headline"] == demo_data.BRIEF_META["headline"]
 
     # ...and persisted, so the next request finds a real row instead of
     # generating one again.
     assert len(tables[MorningBrief]) == 1
-    assert len(tables[BriefAction]) == len(mock_data.ACTION_CHECKLIST)
+    assert len(tables[BriefAction]) == len(demo_data.ACTION_CHECKLIST)
     assert data["meta"]["id"] == str(tables[MorningBrief][0].id)
 
 
@@ -225,10 +225,10 @@ def test_morning_brief_falls_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert data["executiveSummary"] == mock_data.EXECUTIVE_SUMMARY_TEXT
+    assert data["executiveSummary"] == demo_data.EXECUTIVE_SUMMARY_TEXT
     # Persistence isn't possible either when the database is unreachable —
     # this is the pre-migration, mock-only response (stable mock ids).
-    assert data["actionChecklist"][0]["id"] == mock_data.ACTION_CHECKLIST[0]["id"]
+    assert data["actionChecklist"][0]["id"] == demo_data.ACTION_CHECKLIST[0]["id"]
     assert tables[MorningBrief] == []
 
 
@@ -241,12 +241,12 @@ def test_regenerate_creates_and_persists_a_brief_when_none_exists(monkeypatch):
 
     assert data["meta"]["generatedLabel"] == "just now"
     assert len(tables[MorningBrief]) == 1
-    assert len(tables[BriefAction]) == len(mock_data.ACTION_CHECKLIST)
+    assert len(tables[BriefAction]) == len(demo_data.ACTION_CHECKLIST)
 
 
 def test_regenerate_replaces_content_but_preserves_checklist_progress(monkeypatch):
     brief = _fake_brief_row(headline="Yesterday's stale headline")
-    # `chk_1` defaults to `done=False` in `mock_data.ACTION_CHECKLIST` — if
+    # `chk_1` defaults to `done=False` in `demo_data.ACTION_CHECKLIST` — if
     # `regenerate()` incorrectly reset the checklist, this would flip back.
     action = _fake_action_row(brief_id=brief.id, label="Set the Meridian walk-away price", done=True)
     _install_fake_db(monkeypatch, briefs=[brief], actions=[action])
@@ -256,7 +256,7 @@ def test_regenerate_replaces_content_but_preserves_checklist_progress(monkeypatc
     data = response.json()
 
     # Report content is refreshed from the current generator...
-    assert data["meta"]["headline"] == mock_data.BRIEF_META["headline"]
+    assert data["meta"]["headline"] == demo_data.BRIEF_META["headline"]
     assert data["meta"]["headline"] != "Yesterday's stale headline"
 
     # ...but existing checklist progress is left exactly as it was.

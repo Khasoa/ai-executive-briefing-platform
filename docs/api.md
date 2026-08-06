@@ -32,7 +32,7 @@ Lightweight payload for the application shell. Fetched once by the layout rather
 {
   "user": {
     "name": "Lydia",
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
@@ -585,7 +585,7 @@ Returns `profile`, `preferences`, `notifications`, `security`, `theme` and `conn
 ```json
 {
   "profile": {
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
