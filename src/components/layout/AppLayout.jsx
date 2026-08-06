@@ -2,7 +2,7 @@ import { useCallback } from "react"
 import { Outlet } from "react-router-dom"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { useApiQuery } from "@/hooks/useApiQuery"
-import { getWorkspace } from "@/services/briefly"
+import { getWorkspace } from "@/api/workspace"
 
 /**
  * Application shell. The workspace payload (identity, brief freshness, nav

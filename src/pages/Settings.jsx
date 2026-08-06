@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/common/PageHeader"
 import { ListSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { useAsyncAction } from "@/hooks/useAsyncAction"
-import { getSettings, setNotification, updatePreferences } from "@/services/briefly"
+import { getSettings, setNotification, updatePreferences } from "@/api/settings"
 import { cn } from "@/lib/utils"
 
 function Section({ title, description, children, footer }) {

@@ -65,7 +65,7 @@ Key decisions behind Briefly and the reasoning for each.
 - Pydantic already defines and validates the API contract at the boundary that matters
 - `jsconfig.json` preserves path aliases and editor intelligence
 
-**Trade-off:** No compile-time guarantee that a component matches an API response. Mitigated by keeping every fetch in `services/briefly.js` and rendering directly from responses, and by a smoke test that mounts each page against the live API.
+**Trade-off:** No compile-time guarantee that a component matches an API response. Mitigated by keeping every fetch in `src/api/` and rendering directly from responses, and by a smoke test that mounts each page against the live API.
 
 ---
 

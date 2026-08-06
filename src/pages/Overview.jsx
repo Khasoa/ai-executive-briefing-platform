@@ -9,7 +9,7 @@ import { KPIGrid } from "@/components/cards/KPIWidget"
 import { RecommendationCard } from "@/components/cards/RecommendationCard"
 import { OverviewSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
-import { getOverview } from "@/services/briefly"
+import { getOverview } from "@/api/overview"
 import { cn, getGreeting } from "@/lib/utils"
 
 export function OverviewPage() {

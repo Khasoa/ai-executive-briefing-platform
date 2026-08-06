@@ -21,7 +21,7 @@ import { ReportCard } from "@/components/cards/ReportCard"
 import { PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { useAsyncAction } from "@/hooks/useAsyncAction"
-import { askBriefly, getAskWorkspace } from "@/services/briefly"
+import { askBriefly, getAskWorkspace } from "@/api/ask"
 import { fadeUp } from "@/lib/motion"
 
 const SUGGESTION_ICONS = {

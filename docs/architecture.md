@@ -34,8 +34,8 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
 
 | Layer | Responsibility |
 |-------|---------------|
-| `services/client.js` | One `fetch` wrapper: base URL, JSON, abort signals, `ApiError` |
-| `services/briefly.js` | One named function per endpoint. Nothing else builds a URL |
+| `api/client.js` | One `fetch` wrapper: base URL, JSON, timeout, abort, `ApiError` |
+| `api/*.js` | One module per backend domain; nothing else builds a URL |
 | `hooks/useApiQuery.js` | Fetch, loading, error, refetch and abort for a page |
 | `hooks/useAsyncAction.js` | One-off mutations with pending and error state |
 | `pages/` | Compose cards from an API response. No data of their own |

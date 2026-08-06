@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader"
 import { MeetingCard } from "@/components/cards/MeetingCard"
 import { EmptyState, ListSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
-import { getMeetings } from "@/services/briefly"
+import { getMeetings } from "@/api/meetings"
 
 const FILTERS = ["All meetings", "Needs preparation"]
 

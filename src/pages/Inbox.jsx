@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader"
 import { EmailCard } from "@/components/cards/EmailCard"
 import { EmptyState, ListSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
-import { getInbox } from "@/services/briefly"
+import { getInbox } from "@/api/inbox"
 import { bySignal } from "@/lib/signals"
 
 const ALL_TAB = "all"

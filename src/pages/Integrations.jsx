@@ -6,7 +6,7 @@ import { IntegrationCard } from "@/components/cards/IntegrationCard"
 import { ListSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { useAsyncAction } from "@/hooks/useAsyncAction"
-import { getIntegrations, syncIntegration } from "@/services/briefly"
+import { getIntegrations, syncIntegration } from "@/api/integrations"
 import { cn } from "@/lib/utils"
 
 const SYNC_STATUS = {

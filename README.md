@@ -27,7 +27,7 @@ ai-executive-partner/
 │   ├── hooks/            # useApiQuery, useAsyncAction
 │   ├── lib/              # cn, formatting, motion presets, signal vocabulary
 │   ├── pages/            # One file per route
-│   └── services/         # API client — every request the app makes
+│   └── api/              # HTTP client + one module per backend domain
 ├── backend/              # FastAPI backend
 ├── docs/                 # Architecture, API and decision records
 ├── automation/           # n8n workflow definitions (future)
@@ -89,7 +89,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173).
 
-No page holds its own copy of server data — every view is rendered from an API response through `src/services/briefly.js`.
+No page holds its own copy of server data — every view is rendered from an API response through `src/api/` (one module per backend domain).
 
 ### Checks
 

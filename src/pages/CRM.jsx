@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader"
 import { DealCard } from "@/components/cards/DealCard"
 import { EmptyState, ListSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
-import { getPipeline } from "@/services/briefly"
+import { getCrm } from "@/api/crm"
 import { formatCurrency } from "@/lib/utils"
 import { bySignal } from "@/lib/signals"
 
@@ -14,8 +14,8 @@ const FILTERS = ["Needs attention", "Full pipeline"]
 const ATTENTION_LEVELS = new Set(["critical", "high"])
 
 export function CRMPage() {
-  const fetchPipeline = useCallback((options) => getPipeline(options), [])
-  const { data, loading, error, refetch } = useApiQuery(fetchPipeline)
+  const fetchCrm = useCallback((options) => getCrm(options), [])
+  const { data, loading, error, refetch } = useApiQuery(fetchCrm)
   const [filter, setFilter] = useState(FILTERS[0])
 
   const visibleDeals = useMemo(() => {

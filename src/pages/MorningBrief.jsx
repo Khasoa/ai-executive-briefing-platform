@@ -17,7 +17,11 @@ import { SourceChip } from "@/components/common/SourceChip"
 import { DocumentSkeleton, PageError } from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { useAsyncAction } from "@/hooks/useAsyncAction"
-import { getMorningBrief, regenerateMorningBrief, setChecklistItem } from "@/services/briefly"
+import {
+  getMorningBrief,
+  regenerateMorningBrief,
+  setChecklistItem,
+} from "@/api/morningBrief"
 import { cn } from "@/lib/utils"
 import { fadeUp } from "@/lib/motion"
 import { SIGNAL_ACCENT_BAR, SIGNAL_BADGE, SIGNAL_DOT, SIGNAL_LABEL } from "@/lib/signals"
