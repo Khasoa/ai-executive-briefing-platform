@@ -94,12 +94,12 @@ No page holds its own copy of server data — every view is rendered from an API
 ### Checks
 
 ```bash
-npm run lint              # oxlint (project frontend linter)
+npm run lint              # ESLint
 npm run build             # production bundle
 cd backend && pytest -q   # API contract and product invariants
 ```
 
-Frontend lint uses **oxlint** (Oxc). ESLint is not configured in this repository.
+Frontend lint uses **ESLint** (`eslint.config.js`) with `eslint-plugin-react`, React Hooks, and React Refresh for the Vite + JavaScript app.
 
 The backend suite covers every endpoint, both mutation paths, and the invariants that define the product: no endpoint acts on the executive's behalf, and automatic actions cannot be enabled.
 

@@ -43,6 +43,10 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
 | `components/ui/` | Unstyled-by-domain primitives (button, card, badge, tabs…) |
 | `lib/signals.js` | Shared urgency vocabulary so severity looks the same everywhere |
 
+### Tooling
+
+The frontend is plain JavaScript on Vite. Lint with ESLint (`npm run lint`, config in `eslint.config.js`) using `eslint-plugin-react`, React Hooks, and React Refresh. There is no TypeScript and no Prettier in this repository.
+
 ### Why pages hold no data
 
 Each page calls exactly one `useApiQuery`, then renders. Mutations (`regenerate`, checklist toggle, integration sync, preference change) return the updated object and the page applies it with `setData`. There is no client-side duplicate of server state to fall out of sync.
