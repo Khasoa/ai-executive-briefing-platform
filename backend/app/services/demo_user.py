@@ -15,10 +15,10 @@ from app.models import User
 DEMO_USER = {
     "email": "lydia@arcadiasystems.com",
     "name": "Lydia",
-    "full_name": "Lydia Reyes",
+    "full_name": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
-    "avatar": "LR",
+    "avatar": "LK",
     "timezone": "Europe/Athens",
 }
 
