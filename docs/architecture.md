@@ -36,8 +36,9 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
 |-------|---------------|
 | `api/client.js` | One `fetch` wrapper: base URL, JSON, timeout, abort, `ApiError` |
 | `api/*.js` | One module per backend domain; nothing else builds a URL |
-| `hooks/useApiQuery.js` | Fetch, loading, error, refetch and abort for a page |
-| `hooks/useAsyncAction.js` | One-off mutations with pending and error state |
+| `hooks/useApiQuery.js` | Fetch, soft refresh, classified errors, abort for a page |
+| `hooks/useAsyncAction.js` | One-off mutations with pending and `{ data, error }` result |
+| `hooks/useToast.js` | Shared success/error toasts for mutations |
 | `pages/` | Compose cards from an API response. No data of their own |
 | `components/cards/` | Domain cards — the actual product surface |
 | `components/ui/` | Unstyled-by-domain primitives (button, card, badge, tabs…) |

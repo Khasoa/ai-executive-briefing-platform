@@ -7,18 +7,16 @@ import { Card } from "@/components/ui/card"
 import { SourceChip } from "@/components/common/SourceChip"
 import { cn } from "@/lib/utils"
 import { fadeUp } from "@/lib/motion"
-import { SIGNAL_ACCENT_BAR, SIGNAL_BADGE, SIGNAL_DOT, SIGNAL_LABEL } from "@/lib/signals"
+import { SIGNAL_ACCENT_BAR, SIGNAL_BADGE, SIGNAL_DOT, SIGNAL_LABEL, isElevatedSignal } from "@/lib/signals"
 
 function Panel({ icon: Icon, title, count, children, className }) {
   return (
     <section className={cn("min-w-0", className)}>
-      <div className="mb-2.5 flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.75} />
-        <h3 className="eyebrow text-muted-foreground">{title}</h3>
-        {typeof count === "number" && (
-          <span className="rounded bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground numeric">
-            {count}
-          </span>
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-faint" strokeWidth={1.75} aria-hidden="true" />
+        <h3 className="text-[12px] font-semibold text-muted-foreground">{title}</h3>
+        {typeof count === "number" && count > 0 && (
+          <span className="text-[11px] text-faint numeric">{count}</span>
         )}
       </div>
       {children}
@@ -42,61 +40,66 @@ export function ExecutiveSummaryCard({ summary, brief }) {
 
   return (
     <motion.div {...fadeUp}>
-      <Card className="overflow-hidden">
-        <div className="border-b border-border bg-subtle px-6 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              <h2 className="text-[15px] font-semibold tracking-tight">Executive Summary</h2>
-              <Badge variant="quiet">Generated {brief.generatedLabel}</Badge>
+      <Card className="overflow-hidden border-primary/15 ring-1 ring-primary/5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-6">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+              <h2 className="text-[15px] font-semibold tracking-tight">From today&apos;s Morning Brief</h2>
             </div>
-            <Link
-              to="/morning-brief"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}
-            >
-              Read full brief
-              <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-            </Link>
+            <p className="mt-0.5 pl-3.5 text-[12px] text-muted-foreground">
+              Generated {brief.generatedLabel}
+            </p>
           </div>
+          <Link
+            to="/morning-brief"
+            className={cn(buttonVariants({ variant: "primary", size: "sm" }), "gap-1.5")}
+          >
+            Open Morning Brief
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+          </Link>
         </div>
 
-        <div className="px-6 py-6">
-          <p className="max-w-4xl font-serif text-[17px] leading-[1.65] text-foreground text-balance">
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
+          <p className="max-w-3xl font-serif text-[17px] leading-[1.65] text-foreground text-balance sm:text-[18px]">
             {narrative}
           </p>
 
-          <div className="mt-6">
-            <Panel icon={CircleCheck} title="Today's priorities" count={priorities.length}>
-              <ol className="space-y-1.5">
+          <div className="mt-5">
+            <Panel icon={CircleCheck} title="Priorities" count={priorities.length}>
+              <ol className="space-y-1">
                 {priorities.slice(0, 4).map((priority, index) => (
                   <li
                     key={priority.id}
-                    className="flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-border-strong"
+                    className="flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-subtle sm:px-2.5"
                   >
                     <span
                       className={cn(
                         "mt-1 h-4 w-0.5 shrink-0 rounded-full",
                         SIGNAL_ACCENT_BAR[priority.urgency],
                       )}
+                      aria-hidden="true"
                     />
                     <span className="w-4 shrink-0 pt-px text-[13px] font-semibold text-faint numeric">
                       {index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
+                    <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground">
                       {priority.title}
                     </span>
-                    <Badge variant={SIGNAL_BADGE[priority.urgency]}>
-                      {SIGNAL_LABEL[priority.urgency]}
-                    </Badge>
+                    {isElevatedSignal(priority.urgency) && (
+                      <Badge variant={SIGNAL_BADGE[priority.urgency]}>
+                        {SIGNAL_LABEL[priority.urgency]}
+                      </Badge>
+                    )}
                   </li>
                 ))}
               </ol>
             </Panel>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 border-t border-border pt-6 md:grid-cols-2">
-            <Panel icon={AlertTriangle} title="Business risks" count={risks.length}>
-              <ul className="space-y-2.5">
+          <div className="mt-5 grid grid-cols-1 gap-5 border-t border-border pt-5 md:grid-cols-2 md:gap-x-8 md:gap-y-5">
+            <Panel icon={AlertTriangle} title="Risks" count={risks.length}>
+              <ul className="space-y-2">
                 {risks.map((risk) => (
                   <li key={risk.id} className="flex items-start gap-2.5">
                     <span
@@ -104,11 +107,12 @@ export function ExecutiveSummaryCard({ summary, brief }) {
                         "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
                         SIGNAL_DOT[risk.severity],
                       )}
+                      aria-hidden="true"
                     />
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium leading-snug">{risk.title}</p>
                       <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                        {risk.impact} at stake
+                        {risk.impact}
                       </p>
                     </div>
                   </li>
@@ -116,15 +120,11 @@ export function ExecutiveSummaryCard({ summary, brief }) {
               </ul>
             </Panel>
 
-            <Panel
-              icon={CalendarClock}
-              title="Meetings needing preparation"
-              count={meetingsToPrepare.length}
-            >
-              <ul className="space-y-2.5">
+            <Panel icon={CalendarClock} title="Prep needed" count={meetingsToPrepare.length}>
+              <ul className="space-y-2">
                 {meetingsToPrepare.map((meeting) => (
                   <li key={meeting.id} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 w-10 shrink-0 text-[12px] font-medium text-muted-foreground numeric">
+                    <span className="mt-0.5 w-10 shrink-0 text-[12px] font-medium text-faint numeric">
                       {meeting.time}
                     </span>
                     <div className="min-w-0">
@@ -138,8 +138,8 @@ export function ExecutiveSummaryCard({ summary, brief }) {
               </ul>
             </Panel>
 
-            <Panel icon={Users} title="Clients needing attention" count={clientsNeedingAttention.length}>
-              <ul className="space-y-2.5">
+            <Panel icon={Users} title="Clients" count={clientsNeedingAttention.length}>
+              <ul className="space-y-2">
                 {clientsNeedingAttention.map((client) => (
                   <li key={client.id} className="flex items-start gap-2.5">
                     <span
@@ -147,6 +147,7 @@ export function ExecutiveSummaryCard({ summary, brief }) {
                         "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
                         SIGNAL_DOT[client.severity],
                       )}
+                      aria-hidden="true"
                     />
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium leading-snug">
@@ -164,11 +165,14 @@ export function ExecutiveSummaryCard({ summary, brief }) {
               </ul>
             </Panel>
 
-            <Panel icon={ArrowRight} title="Recommended actions" count={recommendedActions.length}>
-              <ul className="space-y-2.5">
+            <Panel icon={ArrowRight} title="Actions" count={recommendedActions.length}>
+              <ul className="space-y-2">
                 {recommendedActions.map((action) => (
                   <li key={action.id} className="flex items-start gap-2.5">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/40" />
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/40"
+                      aria-hidden="true"
+                    />
                     <div className="min-w-0">
                       <p className="text-[13px] font-medium leading-snug">{action.label}</p>
                       <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
@@ -182,10 +186,10 @@ export function ExecutiveSummaryCard({ summary, brief }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-subtle px-6 py-3">
-          <span className="text-[11px] text-muted-foreground">Assembled from</span>
+        <div className="flex flex-wrap items-center gap-1 border-t border-border px-4 py-2.5 sm:px-6">
+          <span className="mr-1 text-[11px] text-faint">Sources</span>
           {brief.sources.map((source) => (
-            <SourceChip key={source} source={source} className="bg-card" />
+            <SourceChip key={source} source={source} />
           ))}
         </div>
       </Card>

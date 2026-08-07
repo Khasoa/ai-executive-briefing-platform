@@ -66,7 +66,8 @@ export function MeetingCard({ meeting, index = 0, defaultOpen = false }) {
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
-          className="flex w-full cursor-pointer items-start gap-4 p-5 text-left transition-colors hover:bg-subtle"
+          aria-label={`${open ? "Collapse" : "Expand"} preparation for ${meeting.title}`}
+          className="flex w-full cursor-pointer items-start gap-3 p-4 text-left transition-colors hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-ring/40 sm:gap-4 sm:p-5"
         >
           <div className="w-14 shrink-0">
             <p className="text-[15px] font-semibold leading-none numeric">{meeting.startTime}</p>
@@ -78,27 +79,31 @@ export function MeetingCard({ meeting, index = 0, defaultOpen = false }) {
               <h3 className="text-[15px] font-semibold leading-snug tracking-tight">
                 {meeting.title}
               </h3>
-              <Badge variant={needsPrep ? "accent" : "quiet"}>
-                {needsPrep ? "Needs preparation" : "Ready"}
-              </Badge>
-              <Badge variant="quiet">{TYPE_LABEL[meeting.type]}</Badge>
+              {needsPrep ? (
+                <Badge variant="accent">Needs prep</Badge>
+              ) : (
+                <span className="text-[11px] text-faint">Ready</span>
+              )}
+              <span className="text-[11px] text-faint">{TYPE_LABEL[meeting.type]}</span>
             </div>
 
-            <p className="mt-1.5 text-[12px] text-muted-foreground">{meeting.prepReason}</p>
+            <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+              {meeting.prepReason}
+            </p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <AvatarGroup
                 people={meeting.attendees.map((attendee) => ({
                   initials: attendee.avatar,
                   title: `${attendee.name} · ${attendee.role}`,
                 }))}
               />
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <MapPin className="h-3 w-3" strokeWidth={1.75} />
+              <span className="inline-flex items-center gap-1 text-[11px] text-faint">
+                <MapPin className="h-3 w-3" strokeWidth={1.75} aria-hidden="true" />
                 {meeting.location}
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Building2 className="h-3 w-3" strokeWidth={1.75} />
+              <span className="inline-flex items-center gap-1 text-[11px] text-faint">
+                <Building2 className="h-3 w-3" strokeWidth={1.75} aria-hidden="true" />
                 {meeting.company.name}
               </span>
             </div>

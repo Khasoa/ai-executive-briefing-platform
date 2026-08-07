@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
 import {
   CalendarClock,
   Inbox,
@@ -37,13 +37,20 @@ function NavItem({ item, badges }) {
       to={item.to}
       end={item.end}
       title={item.label}
+      aria-label={count > 0 ? `${item.label}, ${count}` : item.label}
       className={({ isActive }) =>
         cn(
           "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors duration-150",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40",
           "max-lg:justify-center max-lg:px-0",
-          isActive
-            ? "bg-card text-foreground surface"
-            : "text-muted-foreground hover:bg-card/70 hover:text-foreground",
+          item.highlight &&
+            (isActive
+              ? "bg-accent-soft text-foreground surface"
+              : "text-foreground hover:bg-accent-soft/70"),
+          !item.highlight &&
+            (isActive
+              ? "bg-card text-foreground surface"
+              : "text-muted-foreground hover:bg-card/70 hover:text-foreground"),
         )
       }
     >
@@ -52,13 +59,14 @@ function NavItem({ item, badges }) {
           <item.icon
             className={cn(
               "h-4 w-4 shrink-0 transition-colors",
-              isActive
-                ? item.highlight
-                  ? "text-accent-strong"
-                  : "text-primary"
-                : "text-faint group-hover:text-muted-foreground",
+              item.highlight
+                ? "text-accent-strong"
+                : isActive
+                  ? "text-primary"
+                  : "text-faint group-hover:text-muted-foreground",
             )}
-            strokeWidth={1.75}
+            strokeWidth={item.highlight ? 2 : 1.75}
+            aria-hidden="true"
           />
           <span className="flex-1 truncate max-lg:hidden">{item.label}</span>
           {count > 0 && (
@@ -82,7 +90,10 @@ export function Sidebar({ workspace }) {
   const brief = workspace?.brief
 
   return (
-    <aside className="flex h-screen w-16 shrink-0 flex-col border-r border-border bg-subtle lg:w-60">
+    <aside
+      className="flex h-screen w-14 shrink-0 flex-col border-r border-border bg-subtle sm:w-16 lg:w-60"
+      aria-label="Primary"
+    >
       <div className="flex h-14 items-center gap-2.5 px-4 max-lg:justify-center max-lg:px-0">
         <Logo />
         <div className="min-w-0 max-lg:hidden">
@@ -91,12 +102,12 @@ export function Sidebar({ workspace }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2 max-lg:px-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2 max-lg:px-2" aria-label="Product">
         {PRIMARY_NAV.map((item) => (
           <NavItem key={item.to} item={item} badges={workspace?.badges} />
         ))}
 
-        <div className="my-3 h-px bg-border" />
+        <div className="my-3 h-px bg-border" role="separator" />
 
         {SECONDARY_NAV.map((item) => (
           <NavItem key={item.to} item={item} badges={workspace?.badges} />
@@ -104,15 +115,20 @@ export function Sidebar({ workspace }) {
       </nav>
 
       {brief && (
-        <div className="mx-3 mb-3 rounded-lg border border-border bg-card px-3 py-2.5 max-lg:hidden">
+        <Link
+          to="/morning-brief"
+          className="mx-3 mb-3 rounded-lg border border-accent/20 bg-accent-soft/60 px-3 py-2.5 transition-colors hover:border-accent/35 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40 max-lg:hidden"
+        >
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-soft" />
-            <p className="eyebrow text-muted-foreground">Brief ready</p>
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-strong" aria-hidden="true" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-accent">
+              Brief ready
+            </p>
           </div>
           <p className="mt-1 text-[12px] leading-snug text-secondary-foreground">
-            Generated {brief.generatedLabel} from {brief.sources.length} systems
+            Generated {brief.generatedLabel}
           </p>
-        </div>
+        </Link>
       )}
 
       <div className="border-t border-border p-3">
@@ -122,7 +138,7 @@ export function Sidebar({ workspace }) {
             <div className="min-w-0 flex-1 max-lg:hidden">
               <p className="truncate text-[13px] font-medium leading-tight">{user.fullName}</p>
               <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                {user.role} · {user.company}
+                {user.role}
               </p>
             </div>
           </div>
@@ -131,7 +147,7 @@ export function Sidebar({ workspace }) {
             <Skeleton className="h-8 w-8 rounded-full" />
             <div className="flex-1 space-y-1.5 max-lg:hidden">
               <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-2.5 w-32" />
+              <Skeleton className="h-2.5 w-20" />
             </div>
           </div>
         )}

@@ -36,7 +36,7 @@ Lightweight payload for the application shell. Fetched once by the layout rather
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
-    "avatar": "LR",
+    "avatar": "LK",
     "timezone": "Europe/Athens"
   },
   "brief": {
@@ -591,7 +591,7 @@ Returns `profile`, `preferences`, `notifications`, `security`, `theme` and `conn
     "email": "lydia@arcadiasystems.com",
     "phone": "+30 210 555 0148",
     "timezone": "Europe/Athens (GMT+3)",
-    "avatar": "LR"
+    "avatar": "LK"
   },
   "preferences": {
     "briefTime": "06:30",

@@ -1,6 +1,5 @@
 import { CalendarClock, FileText, Mail, Target } from "lucide-react"
 import { Card } from "@/components/ui/card"
-import { SourceChip } from "@/components/common/SourceChip"
 
 const ICONS = {
   email: Mail,
@@ -16,19 +15,20 @@ export function ActivityFeed({ items }) {
         {items.map((item) => {
           const Icon = ICONS[item.type] ?? Mail
           return (
-            <li key={item.id} className="flex items-start gap-3 px-5 py-3.5">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.75} />
+            <li key={item.id} className="flex items-start gap-2.5 px-3.5 py-3 sm:px-4">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted">
+                <Icon className="h-3 w-3 text-faint" strokeWidth={1.75} aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium leading-snug">{item.title}</p>
                 <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
                   {item.detail}
                 </p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span className="text-[11px] text-faint numeric">{item.time}</span>
-                  <SourceChip source={item.source} className="border-transparent bg-transparent px-0" />
-                </div>
+                <p className="mt-1 text-[11px] text-faint">
+                  <span className="numeric">{item.time}</span>
+                  <span className="mx-1.5 text-border-strong">·</span>
+                  {item.source}
+                </p>
               </div>
             </li>
           )

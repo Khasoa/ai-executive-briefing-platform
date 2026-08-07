@@ -11,8 +11,8 @@ const SOURCE_ICONS = {
 }
 
 /**
- * Shows which connected system a piece of intelligence came from. Every AI
- * statement in Briefly is attributable, so this appears throughout.
+ * Shows which connected system a piece of intelligence came from. Kept quiet so
+ * attribution never competes with the recommendation itself.
  */
 export function SourceChip({ source, detail, count, className }) {
   const Icon = SOURCE_ICONS[source] ?? Database
@@ -20,15 +20,15 @@ export function SourceChip({ source, detail, count, className }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border border-border bg-subtle px-2 py-1 text-[11px] text-secondary-foreground",
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-faint",
         className,
       )}
     >
-      <Icon className="h-3 w-3 text-muted-foreground" strokeWidth={1.75} />
-      <span className="font-medium">{source}</span>
-      {detail && <span className="text-muted-foreground">· {detail}</span>}
+      <Icon className="h-3 w-3 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+      <span>{source}</span>
+      {detail && <span>· {detail}</span>}
       {typeof count === "number" && !detail && (
-        <span className="text-muted-foreground numeric">· {count}</span>
+        <span className="numeric">· {count}</span>
       )}
     </span>
   )
@@ -36,7 +36,7 @@ export function SourceChip({ source, detail, count, className }) {
 
 export function SourceChipList({ sources, className }) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={cn("flex flex-wrap items-center gap-1", className)}>
       {sources.map((source) =>
         typeof source === "string" ? (
           <SourceChip key={source} source={source} />

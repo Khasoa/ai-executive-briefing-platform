@@ -1,10 +1,16 @@
-import { useCallback, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Inbox as InboxIcon, Sparkles } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Tabs } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/common/PageHeader"
+import { RefreshButton } from "@/components/common/RefreshButton"
 import { EmailCard } from "@/components/cards/EmailCard"
-import { EmptyState, ListSkeleton, PageError } from "@/components/feedback/PageState"
+import {
+  EmptyState,
+  ListSkeleton,
+  PageError,
+  RefreshBanner,
+} from "@/components/feedback/PageState"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { getInbox } from "@/api/inbox"
 import { bySignal } from "@/lib/signals"
@@ -12,8 +18,8 @@ import { bySignal } from "@/lib/signals"
 const ALL_TAB = "all"
 
 export function InboxPage() {
-  const fetchInbox = useCallback((options) => getInbox(options), [])
-  const { data, loading, error, refetch } = useApiQuery(fetchInbox)
+  const { data, loading, refreshing, error, refreshError, refetch, clearRefreshError } =
+    useApiQuery(getInbox)
   const [activeTab, setActiveTab] = useState(ALL_TAB)
 
   const tabs = useMemo(() => {
@@ -38,18 +44,22 @@ export function InboxPage() {
   }, [data, activeTab])
 
   if (loading) return <ListSkeleton rows={4} />
-  if (error) return <PageError message={error} onRetry={refetch} />
+  if (error) return <PageError error={error} onRetry={refetch} />
 
-  const { summary, categories } = data
+  const { summary, categories, emails } = data
   const activeCategory = categories.find((category) => category.id === activeTab)
+  const inboxEmpty = emails.length === 0
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 lg:px-10">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
       <PageHeader
         eyebrow="Inbox"
         title={summary.headline}
-        description={`Briefly read ${summary.totalUnread} threads this morning and handled ${summary.handledAutomatically} with your rules. What remains is about ${summary.estimatedClearTime} of work.`}
+        description={`${summary.totalUnread} threads reviewed · ${summary.handledAutomatically} handled by rules · ~${summary.estimatedClearTime} left`}
+        actions={<RefreshButton onClick={refetch} refreshing={refreshing} />}
       />
+
+      <RefreshBanner error={refreshError} onRetry={refetch} onDismiss={clearRefreshError} />
 
       <Card className="mb-6">
         <dl className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
@@ -59,35 +69,54 @@ export function InboxPage() {
             ["Handled by rules", summary.handledAutomatically],
             ["Time to clear", summary.estimatedClearTime],
           ].map(([label, value]) => (
-            <div key={label} className="px-5 py-4">
+            <div key={label} className="px-3 py-3 sm:px-5 sm:py-4">
               <dt className="text-[11px] text-muted-foreground">{label}</dt>
-              <dd className="mt-1 text-[18px] font-semibold numeric">{value}</dd>
+              <dd className="mt-1 text-[16px] font-semibold numeric sm:text-[18px]">{value}</dd>
             </div>
           ))}
         </dl>
       </Card>
 
-      <Tabs tabs={tabs} value={activeTab} onChange={setActiveTab} className="mb-5" />
-
-      {activeCategory && (
-        <div className="mb-4 flex items-start gap-2">
-          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={1.75} />
-          <p className="text-[13px] text-muted-foreground">{activeCategory.description}</p>
-        </div>
-      )}
-
-      {visibleEmails.length === 0 ? (
+      {inboxEmpty ? (
         <EmptyState
           icon={InboxIcon}
-          title="Nothing here"
-          description="No threads in this category need your attention right now."
+          title="No emails need your attention"
+          description="When Gmail is connected, Briefly prioritises threads that need a reply and clears the rest with your rules. Connect Gmail to start filling this inbox."
+          actionLabel="Open Integrations"
+          actionTo="/integrations"
         />
       ) : (
-        <div className="space-y-3">
-          {visibleEmails.map((email, index) => (
-            <EmailCard key={email.id} email={email} index={index} />
-          ))}
-        </div>
+        <>
+          <Tabs tabs={tabs} value={activeTab} onChange={setActiveTab} className="mb-5" />
+
+          {activeCategory && (
+            <div className="mb-4 flex items-start gap-2">
+              <Sparkles
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <p className="text-[13px] text-muted-foreground">{activeCategory.description}</p>
+            </div>
+          )}
+
+          {visibleEmails.length === 0 ? (
+            <EmptyState
+              icon={InboxIcon}
+              title="Nothing in this category"
+              description="No threads match this filter right now. Switch to All, or refresh after your next sync."
+              action={
+                <RefreshButton onClick={refetch} refreshing={refreshing} label="Refresh inbox" />
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {visibleEmails.map((email, index) => (
+                <EmailCard key={email.id} email={email} index={index} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

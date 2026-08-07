@@ -16,8 +16,18 @@ def test_workspace_returns_shell_payload():
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["name"] == "Lydia"
+    assert data["user"]["fullName"] == "Lydia K."
+    assert data["user"]["avatar"] == "LK"
     assert data["brief"]["generatedLabel"]
     assert set(data["badges"]) >= {"inbox", "meetings", "crm"}
+
+
+def test_openapi_branding_is_briefly():
+    info = client.get("/openapi.json").json()["info"]
+    assert info["title"] == "Briefly API"
+    assert "Briefly" in info["description"]
+    assert "Atlas" not in info["title"]
+    assert "Atlas" not in info["description"]
 
 
 def test_overview_returns_summary_kpis_and_focus():

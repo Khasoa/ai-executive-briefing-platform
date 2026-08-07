@@ -24,7 +24,7 @@ ai-executive-partner/
 │   │   ├── feedback/     # Loading, empty and error states
 │   │   ├── layout/       # App shell and sidebar
 │   │   └── ui/           # shadcn-style primitives
-│   ├── hooks/            # useApiQuery, useAsyncAction
+│   ├── hooks/            # useApiQuery, useAsyncAction, useToast
 │   ├── lib/              # cn, formatting, motion presets, signal vocabulary
 │   ├── pages/            # One file per route
 │   └── api/              # HTTP client + one module per backend domain
@@ -105,13 +105,13 @@ The backend suite covers every endpoint, both mutation paths, and the invariants
 
 ## Design Direction
 
-A calm, spacious, premium SaaS surface in the spirit of Linear and Vercel: off-white page, white cards, deep emerald primary, warm amber accent, slate text. Subtle shadows, restrained glass, short transitions. No AI-blue gradients, no glow, no motion for its own sake.
+A calm, spacious, premium SaaS surface in the spirit of Linear and Vercel: off-white page, white cards, deep emerald primary, warm amber accent, slate text. Subtle shadows, short transitions. No AI-blue gradients, no glow, no motion for its own sake.
 
 The Morning Brief additionally uses a serif face for long-form passages and carries a print stylesheet so it can be presented or exported as-is.
 
 ## Future Integrations
 
-Google Calendar, Gmail, Notion and GoHighLevel are wired through the same `IntegrationCard` and sync-history surface today, backed by curated data. OpenAI generates the brief, and n8n is reserved for scheduled generation. Adding a live provider means implementing one module in `backend/app/integrations/` — no schema or UI changes.
+Google Calendar, Gmail, Notion and GoHighLevel share the same `IntegrationCard` and sync-history surface today, backed by PostgreSQL with `demo_data` fallback. The Morning Brief and Ask Briefly still use curated generation until OpenAI is wired; n8n is reserved for scheduled generation. Adding a live provider means implementing one module in `backend/app/integrations/` — no schema or UI changes.
 
 ## Documentation
 

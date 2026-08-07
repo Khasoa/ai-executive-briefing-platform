@@ -4,7 +4,7 @@ FastAPI backend for Briefly — the AI Executive Briefing Platform.
 
 ## Overview
 
-This service assembles the Morning Brief and every view that supports it. Endpoints currently return curated data shaped exactly like the responses the integrations will produce, so the frontend contract is already final. Adding a live provider means implementing one module in `app/integrations/` — routes, schemas and the frontend stay untouched.
+This service assembles the Morning Brief and every view that supports it. Persistence-backed domains read PostgreSQL first and fall back to `demo_data` when a table is empty or unreachable. Response shapes already match what live integrations will return, so the frontend contract is final. Adding a live provider means implementing one module in `app/integrations/` — routes, schemas and the frontend stay untouched.
 
 ## Architecture
 
@@ -59,8 +59,6 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 
 ## Services
 
-| Service | Domain |
-|---------|--------|
 | Service | Domain ownership |
 |---------|------------------|
 | `WorkspaceService` | Shell identity, nav badges, brief freshness (via `MorningBriefService.get_brief_meta()`) |

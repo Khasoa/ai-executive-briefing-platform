@@ -19,7 +19,8 @@ export function Tabs({ tabs, value, onChange, className }) {
             aria-selected={active}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "-mb-px cursor-pointer border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors duration-150",
+              "-mb-px cursor-pointer border-b-2 px-2.5 py-2.5 text-[13px] font-medium transition-colors duration-150 sm:px-3",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40",
               active
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",

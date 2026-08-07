@@ -104,16 +104,22 @@ export function IntegrationCard({ integration, index = 0, onSync, syncing = fals
                 className="gap-1.5"
                 disabled={syncing || integration.status === "syncing"}
                 onClick={() => onSync?.(integration.id)}
+                aria-label={`Sync ${integration.name}`}
               >
                 {syncing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} aria-hidden="true" />
                 ) : (
-                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 )}
                 Sync now
               </Button>
-              <Button size="sm" variant="ghost" className="gap-1.5">
-                <Settings2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5"
+                aria-label={`Configure ${integration.name}`}
+              >
+                <Settings2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 Configure
               </Button>
             </>
