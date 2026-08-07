@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     ask,
+    auth,
     crm,
     daily_brief,
     health,
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(workspace.router)
     app.include_router(overview.router)
     app.include_router(daily_brief.router)

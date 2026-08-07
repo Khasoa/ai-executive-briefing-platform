@@ -1,6 +1,6 @@
 # Briefly Roadmap
 
-## v1.0 — Briefing platform on curated data (Current)
+## v1.0 — Briefing platform on curated data
 
 **Status:** Complete
 
@@ -14,6 +14,21 @@
 - [x] Persistence schema aligned to the API contract
 
 **Goal:** A complete, demonstrable product where only the upstream data is simulated.
+
+---
+
+## v1.0.1 — Authentication foundation (Current)
+
+**Status:** Complete (password auth; Google OAuth deferred)
+
+- [x] Register / login / logout / refresh / me
+- [x] JWT access tokens + rotating opaque refresh tokens
+- [x] Password hashing (bcrypt); nullable `hashed_password` for future OAuth
+- [x] `get_current_user` dependency on all domain routes
+- [x] Demo fallback when `AUTH_REQUIRED=false` (portfolio unchanged)
+- [x] Per-user scoping in services; `daily_briefs.user_id` migration
+
+**Goal:** A clean auth layer integrations and Google OAuth can plug into without rewriting domain services.
 
 ---
 

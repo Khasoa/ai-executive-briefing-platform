@@ -21,6 +21,7 @@ from app.models.integration import Integration
 from app.models.meeting import Meeting
 from app.models.morning_brief import MorningBrief
 from app.models.opportunity import Opportunity
+from app.models.refresh_token import RefreshToken
 from app.models.sync_event import SyncEvent
 from app.models.user import User
 
@@ -32,6 +33,7 @@ __all__ = [
     "Meeting",
     "MorningBrief",
     "Opportunity",
+    "RefreshToken",
     "SyncEvent",
     "User",
 ]

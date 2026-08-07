@@ -12,10 +12,11 @@ This service assembles the Morning Brief and every view that supports it. Persis
 app/
 ├── main.py           # Application factory: CORS, logging, router registration
 ├── api/
-│   ├── deps.py       # Dependency injection (database session)
+│   ├── deps.py       # DI: database session + get_current_user
 │   └── routes/       # HTTP handlers — thin, no business logic
 ├── core/
 │   ├── config.py     # pydantic-settings configuration
+│   ├── security.py   # Password hashing + JWT helpers
 │   └── logging.py    # Logging setup
 ├── db/
 │   ├── base.py       # SQLAlchemy declarative base
@@ -35,6 +36,11 @@ app/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
+| POST | `/auth/register` | Create password account + tokens |
+| POST | `/auth/login` | Password login + tokens |
+| POST | `/auth/refresh` | Rotate refresh token |
+| POST | `/auth/logout` | Revoke refresh token |
+| GET | `/auth/me` | Current user (Bearer or demo fallback) |
 | GET | `/workspace` | Shell payload: identity, brief freshness, nav counts |
 | GET | `/overview` | Executive dashboard (summary/priorities/risks partially DB-backed — see below) |
 | GET | `/daily-brief/latest` | Latest `DailyBrief` row, read directly from PostgreSQL |
@@ -61,6 +67,7 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 
 | Service | Domain ownership |
 |---------|------------------|
+| `AuthService` | Register, login, refresh rotation, logout, access-token resolution |
 | `WorkspaceService` | Shell identity, nav badges, brief freshness (via `MorningBriefService.get_brief_meta()`) |
 | `OverviewService` | Dashboard aggregation — DailyBrief summary slice + MeetingService prep list + brief meta |
 | `DailyBriefService` | `daily_briefs` reads/writes |
@@ -70,15 +77,18 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `CRMService` | `opportunities` |
 | `AskService` | Cited report construction (curated answers until OpenAI); connected sources via `IntegrationService` |
 | `IntegrationService` | `integrations` + `sync_events` |
-| `SettingsService` | Profile/preferences (still curated — waits on auth/`User` preferences) |
+| `SettingsService` | Profile from `User`; demo preferences curated; non-demo preferences on `User.preferences` |
 
-Shared infrastructure: `db_fallback.py` (empty-table + `SQLAlchemyError` fallback with session rollback), `mapping_utils.py` (id/JSONB/relative-time helpers), `demo_user.py` (single-tenant demo user). Domain services own their tables; cross-domain reads always go through the owning service, never through another service's mock collection.
+Shared infrastructure: `db_fallback.py` (empty-table + `SQLAlchemyError` fallback with session rollback), `mapping_utils.py` (id/JSONB/relative-time helpers), `demo_user.py` (demo tenant + `AUTH_REQUIRED=false` fallback). Domain services take `(db, user)` and own their tables; cross-domain reads always go through the owning service, never through another service's mock collection.
+
+Demo mode: with `AUTH_REQUIRED=false` (default), missing Bearer credentials resolve to Lydia's demo user so the portfolio demo is unchanged. Set `AUTH_REQUIRED=true` and a strong `SECRET_KEY` before multi-user production.
 
 ## Database Models
 
 | Model | Purpose |
 |-------|---------|
-| `User` | Executive profile and briefing preferences |
+| `User` | Executive profile, optional password hash, briefing preferences |
+| `RefreshToken` | Hashed opaque refresh tokens (revocable, rotating) |
 | `MorningBrief` | One generated briefing — backs `GET /morning-brief` (Phase 7 of the migration, the final one) |
 | `BriefAction` | Checklist item — the only brief state the user edits — backs `PATCH /morning-brief/checklist/{item_id}` (Phase 7) |
 | `Meeting` | Calendar event plus generated preparation — backs `GET /meetings` (Phase 2 of the migration) |
@@ -139,8 +149,8 @@ Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 ## Production Setup (Railway)
 
 1. PostgreSQL plugin + Python service pointing at `backend/`.
-2. Environment: `DATABASE_URL`, `CORS_ORIGINS`, `ENVIRONMENT=production`, `DEBUG=false`.
-3. Deploy hook: `alembic upgrade head` (applies `001`→`002`→`003`).
+2. Environment: `DATABASE_URL`, `CORS_ORIGINS`, `ENVIRONMENT=production`, `DEBUG=false`, a strong `SECRET_KEY`, and usually `AUTH_REQUIRED=true`.
+3. Deploy hook: `alembic upgrade head` (applies through `004`).
 4. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. One-time seed (or CI step): `python3 scripts/seed.py`
 

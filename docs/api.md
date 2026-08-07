@@ -20,6 +20,74 @@ Sources cited by the AI are one of: `Gmail`, `Google Calendar`, `GoHighLevel`, `
 
 ---
 
+## Authentication
+
+Password accounts issue a short-lived JWT access token and an opaque refresh token. Send the access token as `Authorization: Bearer <accessToken>` on subsequent requests.
+
+When `AUTH_REQUIRED` is `false` (default), requests without a Bearer token resolve to the demo user so the portfolio product behaves as before. When `AUTH_REQUIRED` is `true`, missing or invalid tokens return `401`.
+
+Demo login (after seed / first request that creates the demo user): email `lydia@arcadiasystems.com`, password from `DEMO_USER_PASSWORD` (default `briefly-demo`).
+
+### `POST /auth/register`
+
+Creates an account and returns tokens. Status `201`.
+
+```json
+{
+  "email": "founder@example.com",
+  "password": "secure-pass-99",
+  "fullName": "Alex Founder",
+  "name": "Alex",
+  "role": "CEO",
+  "company": "Example Co",
+  "timezone": "UTC"
+}
+```
+
+### `POST /auth/login`
+
+```json
+{ "email": "founder@example.com", "password": "secure-pass-99" }
+```
+
+### `POST /auth/refresh`
+
+Rotates the refresh token (previous value is revoked).
+
+```json
+{ "refreshToken": "…" }
+```
+
+### `POST /auth/logout`
+
+Revokes the refresh token. Status `204`. Body: `{ "refreshToken": "…" }`.
+
+### Token response shape (`register` / `login` / `refresh`)
+
+```json
+{
+  "accessToken": "eyJ…",
+  "refreshToken": "…",
+  "tokenType": "bearer",
+  "expiresIn": 1800,
+  "user": {
+    "name": "Alex",
+    "fullName": "Alex Founder",
+    "role": "CEO",
+    "company": "Example Co",
+    "email": "founder@example.com",
+    "avatar": "AF",
+    "timezone": "UTC"
+  }
+}
+```
+
+### `GET /auth/me`
+
+Current user. With Bearer → that user. Without Bearer and `AUTH_REQUIRED=false` → demo user.
+
+---
+
 ## Workspace
 
 ### `GET /workspace`

@@ -15,8 +15,9 @@ The system is a modular monolith: one React frontend, one FastAPI backend with c
                             │ REST (JSON, camelCase)
 ┌───────────────────────────▼──────────────────────────────────┐
 │                       FastAPI Backend                        │
-│   Routes ──▶ Services ──▶ PostgreSQL (+ demo_data fallback)  │
+│   Routes ──▶ get_current_user ──▶ Services (scoped by user)  │
 │                   │                                          │
+│                   ├──▶ PostgreSQL (+ demo_data for demo user)│
 │                   └──▶ Integrations (future, read-only)      │
 └───────────────────────────┬──────────────────────────────────┘
                             │
@@ -64,28 +65,34 @@ The Morning Brief adds a serif face for long-form passages and a print styleshee
 
 ### Layer responsibilities
 
-**Routes** (`app/api/routes/`) are thin: receive, inject the session, delegate, return a validated response. No business logic.
+**Routes** (`app/api/routes/`) are thin: receive, inject the session and current user, delegate, return a validated response. No business logic.
+
+**Auth** (`app/api/deps.py`, `app/services/auth_service.py`, `app/core/security.py`):
+- JWT access tokens + opaque, hashed, rotating refresh tokens
+- `get_current_user` resolves Bearer → `User`, or demo user when `AUTH_REQUIRED=false`
+- Domain services take `(db, user)` and filter ownership by `user_id`
 
 **Services** (`app/services/`) own everything else:
 
 | Service | Owns |
 |---------|------|
+| `AuthService` | Register, login, refresh, logout, access-token resolution |
 | `WorkspaceService` | Shell payload; badges via Inbox/Meeting/CRM; brief meta via MorningBrief |
 | `OverviewService` | Dashboard; DailyBrief summary slice; brief meta via MorningBrief |
-| `DailyBriefService` | `daily_briefs` |
+| `DailyBriefService` | `daily_briefs` (per user) |
 | `MorningBriefService` | `morning_briefs`, `brief_actions` |
 | `InboxService` | `emails` |
 | `MeetingService` | `meetings` |
 | `CRMService` | `opportunities` |
 | `AskService` | Cited reports (curated until OpenAI); sources via IntegrationService |
 | `IntegrationService` | `integrations`, `sync_events` |
-| `SettingsService` | Preferences UI state (curated until auth) |
+| `SettingsService` | Profile from `User`; preferences on demo via curated state, else `User.preferences` |
 
-Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` when a table is empty or unreachable (`db_fallback.py`). Cross-domain reads never bypass the owning service. Migration history: [migrations.md](./migrations.md).
+Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` when a table is empty or unreachable *for the demo user* (`db_fallback.py` + `is_demo_user`). Non-demo users get empty collections instead. Cross-domain reads never bypass the owning service. Migration history: [migrations.md](./migrations.md).
 
 **Schemas** (`app/schemas/`) define the API contract only — separate from ORM models. `common.py` holds the shared vocabulary — urgency, severity, confidence, sources and citations.
 
-**Models** (`app/models/`) are persistence-only: `User`, `MorningBrief`, `BriefAction`, `Meeting`, `Email`, `Opportunity`, `Integration`, `SyncEvent`, `DailyBrief`.
+**Models** (`app/models/`) are persistence-only: `User`, `RefreshToken`, `MorningBrief`, `BriefAction`, `Meeting`, `Email`, `Opportunity`, `Integration`, `SyncEvent`, `DailyBrief`.
 
 ### Read-only by design
 

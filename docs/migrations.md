@@ -15,9 +15,10 @@ Revision history was **not** rewritten. Forward revisions repair the drift.
 | `001` | Briefly initial schema (users, morning_briefs, brief_actions, meetings, emails, opportunities, integrations, sync_events). Kept as-is. |
 | `002` | Adds `daily_briefs` (Phase 1 model missing from `001`). No-op if an Atlas-shaped `daily_briefs` already exists. |
 | `003` | Aligns legacy Atlas databases with current models. On a fresh Briefly DB from `001`→`002`, mostly ensures indexes/constraints. On Atlas, rebuilds mismatched empty tables (or renames populated ones to `_legacy_*`), creates missing Briefly tables, drops obsolete Atlas-only tables. |
+| `004` | Auth foundation: `users.hashed_password`, `refresh_tokens`, and required `daily_briefs.user_id` (backfills from the oldest user, deletes orphan rows). |
 
 ```
-<base> → 001 → 002 → 003 (head)
+<base> → 001 → 002 → 003 → 004 (head)
 ```
 
 ## Fresh database
@@ -28,7 +29,7 @@ alembic upgrade head
 # then seed (see backend/README.md)
 ```
 
-A completely empty PostgreSQL database reaches the current model shape through `001` → `002` → `003` with no manual steps.
+A completely empty PostgreSQL database reaches the current model shape through `001` → `002` → `003` → `004` with no manual steps.
 
 ## Existing Railway / Atlas database
 
@@ -37,7 +38,7 @@ cd backend
 # Confirm current stamp
 alembic current
 
-# Apply 002 + 003. Empty Atlas tables are dropped and recreated in
+# Apply 002 → 004. Empty Atlas tables are dropped and recreated in
 # Briefly shape. Tables with rows are renamed to _legacy_<table> instead
 # of deleted — inspect and backfill manually if that ever happens.
 alembic upgrade head
@@ -60,7 +61,7 @@ That entry point runs every domain seed in dependency order. Individual `scripts
 
 ## Model ↔ migration parity
 
-Every SQLAlchemy model under `app/models/` is registered in `alembic/env.py` via `app.models`. Indexes and unique constraints declared in `__table_args__` match revisions `001`–`003`:
+Every SQLAlchemy model under `app/models/` is registered in `alembic/env.py` via `app.models`. Indexes and unique constraints declared in `__table_args__` match revisions `001`–`004`:
 
 - `uq_brief_per_user_per_day`, `ix_morning_briefs_user_date`
 - `ix_brief_actions_brief`
@@ -69,3 +70,5 @@ Every SQLAlchemy model under `app/models/` is registered in `alembic/env.py` via
 - `ix_opportunities_user_risk`
 - `uq_integration_per_user_provider`
 - `ix_sync_events_integration_time`
+- `ix_refresh_tokens_user`, unique `refresh_tokens.token_hash`
+- `ix_daily_briefs_user_generated`

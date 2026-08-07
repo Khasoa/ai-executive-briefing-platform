@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Email
+from app.models import Email, User
 from app.schemas.inbox import EmailSchema, InboxResponse
 from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
+from app.services.demo_user import is_demo_user
 from app.services.mapping_utils import stringify_id
 
 logger = logging.getLogger("briefly.inbox")
@@ -31,8 +32,9 @@ class InboxService:
     `demo_data.EMAILS` directly.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_inbox(self) -> InboxResponse:
         emails = self.list_emails()
@@ -69,10 +71,16 @@ class InboxService:
         and empty check live in `load_rows_with_fallback`, shared with
         `MeetingService`, `CRMService` and `IntegrationService`.
         """
+        fallback = demo_data.EMAILS if is_demo_user(self.user) else []
         return load_rows_with_fallback(
-            query=lambda: self.db.query(Email).order_by(Email.received_at.desc()).all(),
+            query=lambda: (
+                self.db.query(Email)
+                .filter(Email.user_id == self.user.id)
+                .order_by(Email.received_at.desc())
+                .all()
+            ),
             to_dict=self._to_dict,
-            fallback=demo_data.EMAILS,
+            fallback=fallback,
             logger=logger,
             label="emails",
             db=self.db,

@@ -6,11 +6,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.models import Opportunity
+from app.models import Opportunity, User
 from app.services import demo_data
 from app.services.crm_service import CRMService
+from app.services.demo_user import DEMO_USER, DEMO_USER_FALLBACK_ID
 
 client = TestClient(app)
+
+
+def _demo_user() -> User:
+    return User(id=DEMO_USER_FALLBACK_ID, **DEMO_USER, hashed_password="!")
 
 
 def _fake_opportunity_row(**overrides) -> Opportunity:
@@ -46,16 +51,22 @@ def _fake_opportunity_row(**overrides) -> Opportunity:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `CRMService.list_opportunities()`."""
+    """Just enough of the SQLAlchemy `Query` surface for list + auth demo lookup."""
 
     def __init__(self, rows):
-        self._rows = rows
+        self._rows = list(rows)
+
+    def filter(self, *args, **kwargs):
+        return self
 
     def order_by(self, *args, **kwargs):
         return self
 
     def all(self):
-        return self._rows
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
@@ -64,9 +75,11 @@ def _patch_query(monkeypatch, *, rows=None, raise_error=False):
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""
 
-    def _fake_query(self, *args, **kwargs):
+    def _fake_query(self, model=None, *args, **kwargs):
         if raise_error:
             raise SQLAlchemyError("connection refused")
+        if model is User:
+            return _FakeQuery([_demo_user()])
         return _FakeQuery(rows or [])
 
     monkeypatch.setattr(Session, "query", _fake_query)
@@ -124,7 +137,7 @@ def test_get_opportunity_reads_from_postgres_when_rows_exist(monkeypatch):
 
     # `Session()` here is never actually connected to anything — `query()`
     # is monkeypatched away entirely, so no real database access happens.
-    opportunity = CRMService(db=Session()).get_opportunity(str(row.id))
+    opportunity = CRMService(db=Session(), user=_demo_user()).get_opportunity(str(row.id))
     assert opportunity.company == "Database Corp"
     assert opportunity.aiSummary == "Database-backed AI summary."
 
@@ -133,7 +146,9 @@ def test_get_opportunity_falls_back_to_mock_data_when_table_is_empty(monkeypatch
     _patch_query(monkeypatch, rows=[])
 
     mock_opportunity = demo_data.OPPORTUNITIES[0]
-    opportunity = CRMService(db=Session()).get_opportunity(mock_opportunity["id"])
+    opportunity = CRMService(db=Session(), user=_demo_user()).get_opportunity(
+        mock_opportunity["id"]
+    )
     assert opportunity.company == mock_opportunity["company"]
 
 
@@ -141,7 +156,7 @@ def test_unknown_opportunity_raises_404(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     try:
-        CRMService(db=Session()).get_opportunity("not-a-real-id")
+        CRMService(db=Session(), user=_demo_user()).get_opportunity("not-a-real-id")
         assert False, "expected HTTPException"
     except Exception as exc:
         assert getattr(exc, "status_code", None) == 404

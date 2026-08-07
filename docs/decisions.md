@@ -91,21 +91,25 @@ Key decisions behind Briefly and the reasoning for each.
 
 ```python
 @router.get("", response_model=CRMResponse)
-def get_pipeline(db: Session = Depends(get_db)) -> CRMResponse:
-    return CRMService(db).get_pipeline()
+def get_pipeline(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CRMResponse:
+    return CRMService(db, user).get_pipeline()
 ```
 
 ---
 
 ## ADR-008: Demo data behind real service boundaries
 
-**Decision:** Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` only when a table is empty or unreachable. Surfaces that are not yet persisted (Ask curated reports, Settings, Overview KPIs/activity/focus) still read `demo_data` through their owning service.
+**Decision:** Persistence-backed services read PostgreSQL first and fall back to `demo_data.py` only when a table is empty or unreachable *and* the request is the demo user. Surfaces that are not yet persisted (Ask curated reports, Settings notifications/theme, Overview KPIs/activity/focus) still read `demo_data` through their owning service for the demo tenant. Authenticated non-demo users see empty lists instead of Lydia's curated portfolio data.
 
 **Why:**
 - The frontend can be built and demonstrated end to end immediately
 - Response shapes stay stable while integrations and OpenAI are wired in
 - Empty-table / DB-error fallbacks degrade a page instead of breaking it
 - Computed values (weighted pipeline, prep counts, scheduled minutes) are calculated, not hardcoded
+- Multi-user isolation must never leak curated demo content into a real account
 
 **Trade-off:** Fallback and still-curated surfaces reset on process restart when the database is empty. Acceptable until those domains are fully persisted and externally sourced.
 
@@ -174,3 +178,23 @@ def get_pipeline(db: Session = Depends(get_db)) -> CRMResponse:
 - Railway injects configuration as environment variables
 - Type-safe with sensible defaults for local development
 - One source of truth for database URL, CORS origins and log level
+
+---
+
+## ADR-015: Auth foundation with demo fallback
+
+**Decision:** Password + JWT access tokens + opaque rotating refresh tokens, with `AUTH_REQUIRED=false` resolving missing Bearer credentials to the demo user (`lydia@arcadiasystems.com`).
+
+**Why:**
+- Portfolio demos must keep working without a login screen
+- Future Google OAuth needs a stable `User` row and the same `get_current_user` dependency
+- Refresh tokens must be revocable on logout (opaque hash in PostgreSQL), while access tokens stay short-lived JWTs
+- `hashed_password` is nullable so OAuth-only accounts can exist later without inventing a password
+
+**How it shows up:**
+- `POST /auth/register|login|refresh|logout`, `GET /auth/me`
+- Every domain route injects `User` via `get_current_user` and filters by `user_id`
+- Curated `demo_data` fallbacks apply only when `is_demo_user(user)` is true
+- Flip `AUTH_REQUIRED=true` to require a Bearer token on protected routes
+
+**Google OAuth later:** exchange the Google code → find-or-create `User` by email (or link table) → issue the same `TokenResponse`. Calendar/Gmail scopes land on `Integration` rows owned by that user.

@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.db.session import SessionLocal  # noqa: E402
 from app.services.daily_brief_service import DailyBriefService  # noqa: E402
+from app.services.demo_user import get_or_create_demo_user  # noqa: E402
 
 SUMMARY = (
     "Meridian Labs has gone quiet for nine days on a $480K renewal that closes Friday, and their "
@@ -87,7 +88,8 @@ EXECUTIVE_SCORE = 74
 def seed() -> None:
     db = SessionLocal()
     try:
-        brief = DailyBriefService(db).create_brief(
+        user = get_or_create_demo_user(db)
+        brief = DailyBriefService(db, user).create_brief(
             summary=SUMMARY,
             priorities=PRIORITIES,
             risks=RISKS,

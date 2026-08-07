@@ -3,10 +3,11 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Opportunity
+from app.models import Opportunity, User
 from app.schemas.crm import CRMResponse, OpportunitySchema
 from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
+from app.services.demo_user import is_demo_user
 from app.services.mapping_utils import jsonb_or_default, stringify_id
 
 logger = logging.getLogger("briefly.crm")
@@ -30,8 +31,9 @@ class CRMService:
     `demo_data.OPPORTUNITIES` directly.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_pipeline(self) -> CRMResponse:
         opportunities = self.list_opportunities()
@@ -78,10 +80,16 @@ class CRMService:
         `load_rows_with_fallback`, shared with `MeetingService`,
         `InboxService` and `IntegrationService`.
         """
+        fallback = demo_data.OPPORTUNITIES if is_demo_user(self.user) else []
         return load_rows_with_fallback(
-            query=lambda: self.db.query(Opportunity).order_by(Opportunity.close_date.asc()).all(),
+            query=lambda: (
+                self.db.query(Opportunity)
+                .filter(Opportunity.user_id == self.user.id)
+                .order_by(Opportunity.close_date.asc())
+                .all()
+            ),
             to_dict=self._to_dict,
-            fallback=demo_data.OPPORTUNITIES,
+            fallback=fallback,
             logger=logger,
             label="opportunities",
             db=self.db,

@@ -1,15 +1,14 @@
 """DailyBrief — Phase 1 of the PostgreSQL migration.
 
-The first slice of the Morning Brief moved off `demo_data` and onto a real
-table. Has no relationships to other models (yet) — it stands alone.
+Owned by a `User` so multi-tenant reads never leak another executive's brief.
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -31,8 +30,12 @@ class DailyBrief(Base):
     """
 
     __tablename__ = "daily_briefs"
+    __table_args__ = (Index("ix_daily_briefs_user_generated", "user_id", "generated_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -44,3 +47,5 @@ class DailyBrief(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    user: Mapped["User"] = relationship(back_populates="daily_briefs")

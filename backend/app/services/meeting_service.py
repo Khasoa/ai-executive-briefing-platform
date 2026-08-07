@@ -3,10 +3,11 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models import Meeting
+from app.models import Meeting, User
 from app.schemas.meetings import MeetingSchema, MeetingsResponse
 from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
+from app.services.demo_user import is_demo_user
 from app.services.mapping_utils import jsonb_or_default, stringify_id
 
 logger = logging.getLogger("briefly.meetings")
@@ -26,8 +27,9 @@ class MeetingService:
     instead of reading `demo_data.MEETINGS` directly.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_meetings(self) -> MeetingsResponse:
         meetings = self.list_meetings()
@@ -69,10 +71,16 @@ class MeetingService:
         try/except and empty check live in `load_rows_with_fallback`, shared
         with `InboxService`, `CRMService` and `IntegrationService`.
         """
+        fallback = demo_data.MEETINGS if is_demo_user(self.user) else []
         return load_rows_with_fallback(
-            query=lambda: self.db.query(Meeting).order_by(Meeting.starts_at.asc()).all(),
+            query=lambda: (
+                self.db.query(Meeting)
+                .filter(Meeting.user_id == self.user.id)
+                .order_by(Meeting.starts_at.asc())
+                .all()
+            ),
             to_dict=self._to_dict,
-            fallback=demo_data.MEETINGS,
+            fallback=fallback,
             logger=logger,
             label="meetings",
             db=self.db,

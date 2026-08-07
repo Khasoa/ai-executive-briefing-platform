@@ -3,31 +3,34 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from app.models import User
 from app.schemas.ask import AskReportResponse, AskWorkspaceResponse
 from app.services import demo_data
+from app.services.demo_user import is_demo_user
 from app.services.integration_service import IntegrationService
 
 
 class AskService:
     """Answers executive questions as cited report cards, never as raw chat."""
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_workspace(self) -> AskWorkspaceResponse:
         # Goes through `IntegrationService` rather than `demo_data.INTEGRATIONS`
         # directly, so `connectedSources` reflects real connection state the
         # moment `integrations` has rows, matching every other cross-service
         # read in this refactor.
-        integrations = IntegrationService(self.db).list_integrations()
+        integrations = IntegrationService(self.db, self.user).list_integrations()
         connected = [
             integration["name"]
             for integration in integrations
             if integration["status"] in ("connected", "syncing")
         ]
         return AskWorkspaceResponse(
-            suggestions=demo_data.ASK_SUGGESTIONS,
-            recent=demo_data.ASK_RECENT,
+            suggestions=demo_data.ASK_SUGGESTIONS if is_demo_user(self.user) else [],
+            recent=demo_data.ASK_RECENT if is_demo_user(self.user) else [],
             connectedSources=connected,
         )
 

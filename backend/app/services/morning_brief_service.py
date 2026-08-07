@@ -6,11 +6,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models import BriefAction, MorningBrief
+from app.models import BriefAction, MorningBrief, User
 from app.schemas.morning_brief import ChecklistItemSchema, MorningBriefResponse
 from app.services import demo_data
 from app.services.db_fallback import read_with_fallback
-from app.services.demo_user import get_or_create_demo_user
+from app.services.demo_user import public_user_dict
 from app.services.inbox_service import InboxService
 from app.services.mapping_utils import jsonb_or_default, relative_time_label, stringify_id
 from app.services.meeting_service import MeetingService
@@ -46,8 +46,9 @@ class MorningBriefService:
     for real the moment those tables are migrated.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_brief(self) -> MorningBriefResponse:
         brief, actions = self._load_or_generate_brief()
@@ -157,10 +158,12 @@ class MorningBriefService:
         return self._generate_and_persist()
 
     def _read_todays_brief(self) -> MorningBrief | None:
-        user = get_or_create_demo_user(self.db)
         return (
             self.db.query(MorningBrief)
-            .filter(MorningBrief.user_id == user.id, MorningBrief.brief_date == date.today())
+            .filter(
+                MorningBrief.user_id == self.user.id,
+                MorningBrief.brief_date == date.today(),
+            )
             .order_by(MorningBrief.generated_at.desc())
             .first()
         )
@@ -199,16 +202,18 @@ class MorningBriefService:
         generated for a given day — if today's brief already has a
         checklist, it is left untouched (see `regenerate()`).
         """
-        user = get_or_create_demo_user(self.db)
         today = date.today()
 
         brief = (
             self.db.query(MorningBrief)
-            .filter(MorningBrief.user_id == user.id, MorningBrief.brief_date == today)
+            .filter(
+                MorningBrief.user_id == self.user.id,
+                MorningBrief.brief_date == today,
+            )
             .first()
         )
         if brief is None:
-            brief = MorningBrief(user_id=user.id, brief_date=today)
+            brief = MorningBrief(user_id=self.user.id, brief_date=today)
             self.db.add(brief)
 
         brief.headline = content["headline"]
@@ -280,7 +285,7 @@ class MorningBriefService:
                 "sources": brief.sources,
                 "headline": brief.headline,
             },
-            preparedFor=demo_data.USER,
+            preparedFor=public_user_dict(self.user),
             executiveSummary=brief.executive_summary,
             topPriorities=sections.get("priorities", []),
             criticalRisks=sections.get("risks", []),
@@ -320,7 +325,7 @@ class MorningBriefService:
         """
         return MorningBriefResponse(
             meta=demo_data.BRIEF_META,
-            preparedFor=demo_data.USER,
+            preparedFor=public_user_dict(self.user),
             executiveSummary=demo_data.EXECUTIVE_SUMMARY_TEXT,
             topPriorities=demo_data.PRIORITIES,
             criticalRisks=demo_data.RISKS,
@@ -346,13 +351,13 @@ class MorningBriefService:
                 "prepStatus": meeting["prepStatus"],
                 "note": meeting["prepReason"],
             }
-            for meeting in MeetingService(self.db).list_meetings()
+            for meeting in MeetingService(self.db, self.user).list_meetings()
         ]
 
     def _important_emails(self) -> list[dict]:
         # Goes through `InboxService` rather than `demo_data.EMAILS`
         # directly, for the same reason as `_meetings()` above.
-        emails = InboxService(self.db).list_emails()
+        emails = InboxService(self.db, self.user).list_emails()
         by_id = {email["id"]: email for email in emails}
 
         # Prefer the curated mock ordering when those stable ids are present

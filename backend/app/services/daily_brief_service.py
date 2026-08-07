@@ -3,21 +3,16 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models import DailyBrief
+from app.models import DailyBrief, User
 from app.schemas.daily_brief import DailyBriefSchema
 
 
 class DailyBriefService:
-    """Reads and writes the `daily_briefs` table.
+    """Reads and writes the `daily_briefs` table, scoped to one user."""
 
-    This is the first service in Briefly that talks to PostgreSQL for real,
-    rather than reading `demo_data`. It is used by `OverviewService` for three
-    fields (`summary`, `priorities`, `risks`) and by the standalone
-    `GET /daily-brief/latest` endpoint, which exposes the raw table directly.
-    """
-
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def create_brief(
         self,
@@ -31,6 +26,7 @@ class DailyBriefService:
     ) -> DailyBriefSchema:
         """Insert one generated briefing and return it in API shape."""
         brief = DailyBrief(
+            user_id=self.user.id,
             generated_at=generated_at or datetime.now(timezone.utc),
             summary=summary,
             priorities=priorities,
@@ -44,26 +40,27 @@ class DailyBriefService:
         return self._to_schema(brief)
 
     def get_latest_brief(self) -> DailyBriefSchema | None:
-        """Return the most recently generated brief, or `None` if the table is empty.
-
-        SQLAlchemy retrieval: this issues
-        `SELECT * FROM daily_briefs ORDER BY generated_at DESC LIMIT 1` through
-        the ORM (`.order_by(...).first()`), then maps the single row onto
-        `DailyBriefSchema`. There is no caching layer yet, so "latest" is
-        always a live read — every call to `OverviewService.get_overview()`
-        re-queries this table.
-        """
-        brief = self.db.query(DailyBrief).order_by(DailyBrief.generated_at.desc()).first()
+        """Return the most recently generated brief for this user, or `None`."""
+        brief = (
+            self.db.query(DailyBrief)
+            .filter(DailyBrief.user_id == self.user.id)
+            .order_by(DailyBrief.generated_at.desc())
+            .first()
+        )
         return self._to_schema(brief) if brief else None
 
     def get_brief_by_id(self, brief_id: str) -> DailyBriefSchema | None:
-        """Primary-key lookup for a single brief (e.g. a future brief-history page)."""
+        """Primary-key lookup for a single brief owned by this user."""
         try:
             brief_uuid = uuid.UUID(brief_id)
         except ValueError:
             return None
 
-        brief = self.db.get(DailyBrief, brief_uuid)
+        brief = (
+            self.db.query(DailyBrief)
+            .filter(DailyBrief.id == brief_uuid, DailyBrief.user_id == self.user.id)
+            .first()
+        )
         return self._to_schema(brief) if brief else None
 
     @staticmethod

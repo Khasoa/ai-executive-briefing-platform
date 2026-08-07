@@ -6,11 +6,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.models import Email
+from app.models import Email, User
 from app.services import demo_data
+from app.services.demo_user import DEMO_USER, DEMO_USER_FALLBACK_ID
 from app.services.inbox_service import InboxService
 
 client = TestClient(app)
+
+
+def _demo_user() -> User:
+    # Non-null password hash avoids a write path inside get_or_create_demo_user
+    # when Session.query is patched for InboxService tests.
+    return User(id=DEMO_USER_FALLBACK_ID, **DEMO_USER, hashed_password="!")
 
 ATHENS = timezone(timedelta(hours=3))
 
@@ -42,16 +49,22 @@ def _fake_email_row(**overrides) -> Email:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `InboxService.list_emails()`."""
+    """Just enough of the SQLAlchemy `Query` surface for list + auth demo lookup."""
 
     def __init__(self, rows):
-        self._rows = rows
+        self._rows = list(rows)
+
+    def filter(self, *args, **kwargs):
+        return self
 
     def order_by(self, *args, **kwargs):
         return self
 
     def all(self):
-        return self._rows
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
@@ -60,9 +73,12 @@ def _patch_query(monkeypatch, *, rows=None, raise_error=False):
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""
 
-    def _fake_query(self, *args, **kwargs):
+    def _fake_query(self, model=None, *args, **kwargs):
         if raise_error:
             raise SQLAlchemyError("connection refused")
+        # `get_current_user` resolves the demo tenant before InboxService runs.
+        if model is User:
+            return _FakeQuery([_demo_user()])
         return _FakeQuery(rows or [])
 
     monkeypatch.setattr(Session, "query", _fake_query)
@@ -124,7 +140,7 @@ def test_get_email_reads_from_postgres_when_rows_exist(monkeypatch):
 
     # `Session()` here is never actually connected to anything — `query()`
     # is monkeypatched away entirely, so no real database access happens.
-    email = InboxService(db=Session()).get_email(str(row.id))
+    email = InboxService(db=Session(), user=_demo_user()).get_email(str(row.id))
     assert email.subject == "Database Email One"
     assert email.aiSummary == "Database-backed AI summary."
 
@@ -133,5 +149,5 @@ def test_get_email_falls_back_to_mock_data_when_table_is_empty(monkeypatch):
     _patch_query(monkeypatch, rows=[])
 
     mock_email = demo_data.EMAILS[0]
-    email = InboxService(db=Session()).get_email(mock_email["id"])
+    email = InboxService(db=Session(), user=_demo_user()).get_email(mock_email["id"])
     assert email.subject == mock_email["subject"]

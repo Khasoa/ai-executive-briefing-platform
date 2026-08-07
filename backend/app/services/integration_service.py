@@ -6,10 +6,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Integration, SyncEvent
+from app.models import Integration, SyncEvent, User
 from app.schemas.integrations import IntegrationsResponse
 from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
+from app.services.demo_user import is_demo_user
 from app.services.mapping_utils import jsonb_or_default, relative_time_label, stringify_id
 
 logger = logging.getLogger("briefly.integrations")
@@ -26,8 +27,9 @@ class IntegrationService:
     `demo_data.INTEGRATIONS` directly.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, user: User) -> None:
         self.db = db
+        self.user = user
 
     def get_integrations(self) -> IntegrationsResponse:
         integrations = self.list_integrations()
@@ -97,10 +99,16 @@ class IntegrationService:
 
     def list_integrations(self) -> list[dict]:
         """Read every integration from PostgreSQL, falling back to `demo_data.INTEGRATIONS`."""
+        fallback = demo_data.INTEGRATIONS if is_demo_user(self.user) else []
         return load_rows_with_fallback(
-            query=lambda: self.db.query(Integration).order_by(Integration.provider.asc()).all(),
+            query=lambda: (
+                self.db.query(Integration)
+                .filter(Integration.user_id == self.user.id)
+                .order_by(Integration.provider.asc())
+                .all()
+            ),
             to_dict=self._to_dict,
-            fallback=demo_data.INTEGRATIONS,
+            fallback=fallback,
             logger=logger,
             label="integrations",
             db=self.db,
@@ -108,16 +116,19 @@ class IntegrationService:
 
     def list_sync_history(self) -> list[dict]:
         """Read sync audit rows from PostgreSQL, falling back to `demo_data.SYNC_HISTORY`."""
+        fallback = demo_data.SYNC_HISTORY if is_demo_user(self.user) else []
         return load_rows_with_fallback(
             query=lambda: (
                 self.db.query(SyncEvent)
                 .options(joinedload(SyncEvent.integration))
+                .join(Integration)
+                .filter(Integration.user_id == self.user.id)
                 .order_by(SyncEvent.occurred_at.desc())
                 .limit(50)
                 .all()
             ),
             to_dict=self._sync_event_to_dict,
-            fallback=demo_data.SYNC_HISTORY,
+            fallback=fallback,
             logger=logger,
             label="sync_events",
             db=self.db,
@@ -128,7 +139,10 @@ class IntegrationService:
         try:
             row = (
                 self.db.query(Integration)
-                .filter(Integration.provider == provider)
+                .filter(
+                    Integration.user_id == self.user.id,
+                    Integration.provider == provider,
+                )
                 .first()
             )
             if row is None:

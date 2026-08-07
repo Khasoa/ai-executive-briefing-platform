@@ -69,6 +69,9 @@ class _FakeQuery:
     def filter(self, *args, **kwargs):
         return self
 
+    def join(self, *args, **kwargs):
+        return self
+
     def all(self):
         return list(self._rows)
 
@@ -79,9 +82,15 @@ class _FakeQuery:
 def _patch_session(monkeypatch, *, integrations=None, sync_events=None, raise_error=False):
     """Patches `Session` so IntegrationService runs its real query/write logic."""
 
+    from app.models import User
+    from app.services.demo_user import DEMO_USER, DEMO_USER_FALLBACK_ID
+
     tables = {
         Integration: list(integrations or []),
         SyncEvent: list(sync_events or []),
+        User: [
+            User(id=DEMO_USER_FALLBACK_ID, **DEMO_USER, hashed_password="!"),
+        ],
     }
 
     def _fake_query(self, model, *args, **kwargs):

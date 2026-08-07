@@ -6,12 +6,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.models import Meeting
+from app.models import Meeting, User
 from app.services import demo_data
+from app.services.demo_user import DEMO_USER, DEMO_USER_FALLBACK_ID
 
 client = TestClient(app)
 
 ATHENS = timezone(timedelta(hours=3))
+
+
+def _demo_user() -> User:
+    return User(id=DEMO_USER_FALLBACK_ID, **DEMO_USER, hashed_password="!")
 
 
 def _fake_meeting_row(**overrides) -> Meeting:
@@ -53,16 +58,22 @@ def _fake_meeting_row(**overrides) -> Meeting:
 
 
 class _FakeQuery:
-    """Just enough of the SQLAlchemy `Query` surface for `MeetingService.list_meetings()`."""
+    """Just enough of the SQLAlchemy `Query` surface for list + auth demo lookup."""
 
     def __init__(self, rows):
-        self._rows = rows
+        self._rows = list(rows)
+
+    def filter(self, *args, **kwargs):
+        return self
 
     def order_by(self, *args, **kwargs):
         return self
 
     def all(self):
-        return self._rows
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
 
 
 def _patch_query(monkeypatch, *, rows=None, raise_error=False):
@@ -71,9 +82,11 @@ def _patch_query(monkeypatch, *, rows=None, raise_error=False):
     instead of either hitting a live database or bypassing the fallback
     logic entirely by monkeypatching a higher-level method."""
 
-    def _fake_query(self, *args, **kwargs):
+    def _fake_query(self, model=None, *args, **kwargs):
         if raise_error:
             raise SQLAlchemyError("connection refused")
+        if model is User:
+            return _FakeQuery([_demo_user()])
         return _FakeQuery(rows or [])
 
     monkeypatch.setattr(Session, "query", _fake_query)
