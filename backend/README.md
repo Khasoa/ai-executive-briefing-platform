@@ -41,6 +41,15 @@ app/
 | POST | `/auth/refresh` | Rotate refresh token |
 | POST | `/auth/logout` | Revoke refresh token |
 | GET | `/auth/me` | Current user (Bearer or demo fallback) |
+| GET | `/auth/oauth/{provider}/start` | Begin OAuth (`google`, `notion`, `gohighlevel`) |
+| GET | `/auth/oauth/{provider}/callback` | Provider redirect; tokens or ticket redirect |
+| POST | `/auth/oauth/{provider}/exchange` | Exchange one-time OAuth ticket for tokens |
+| GET | `/auth/oauth/{provider}/status` | Connection status |
+| POST | `/auth/oauth/{provider}/refresh` | Refresh / return provider access token |
+| POST | `/auth/oauth/{provider}/disconnect` | Clear stored provider tokens |
+| POST | `/webhooks/n8n/run` | n8n orchestration (secret header) |
+| POST | `/webhooks/n8n/daily` | Sync providers + Morning Brief |
+| POST | `/webhooks/n8n/weekly` | Sync providers + Weekly Digest |
 | GET | `/workspace` | Shell payload: identity, brief freshness, nav counts |
 | GET | `/overview` | Executive dashboard (summary/priorities/risks partially DB-backed — see below) |
 | GET | `/daily-brief/latest` | Latest `DailyBrief` row, read directly from PostgreSQL |
@@ -67,16 +76,25 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 
 | Service | Domain ownership |
 |---------|------------------|
-| `AuthService` | Register, login, refresh rotation, logout, access-token resolution |
+| `AuthService` | Register, login, refresh rotation, logout, access-token resolution, `issue_tokens` |
+| `OAuthService` | Provider authorize/callback, find-or-create user, encrypted token storage, provider refresh |
+| `CalendarSyncService` | Incremental Google Calendar → `Meeting` sync (webhook + manual) |
+| `GmailSyncService` | Incremental Gmail → `Email` sync (webhook + manual); leaves AI fields empty |
+| `AIService` | Sole OpenAI orchestration (Morning Brief, meeting prep, email summary, Ask) |
 | `WorkspaceService` | Shell identity, nav badges, brief freshness (via `MorningBriefService.get_brief_meta()`) |
 | `OverviewService` | Dashboard aggregation — DailyBrief summary slice + MeetingService prep list + brief meta |
 | `DailyBriefService` | `daily_briefs` reads/writes |
-| `MorningBriefService` | `morning_briefs` / `brief_actions` — assembly, regenerate, checklist |
-| `InboxService` | `emails` |
-| `MeetingService` | `meetings` |
-| `CRMService` | `opportunities` |
-| `AskService` | Cited report construction (curated answers until OpenAI); connected sources via `IntegrationService` |
-| `IntegrationService` | `integrations` + `sync_events` |
+| `MorningBriefService` | `morning_briefs` / `brief_actions` — AI generation + curated failover, checklist |
+| `InboxService` | `emails` — lazy AI summary on detail when fields empty |
+| `MeetingService` | `meetings` — lazy AI prep on detail when intelligence empty |
+| `CRMService` | `opportunities` (incl. GoHighLevel-synced deals) |
+| `GHLSyncService` | GoHighLevel opportunities → `Opportunity` (idempotent `external_id`) |
+| `MondaySyncService` | monday.com boards/items → `WorkItem` |
+| `ClickUpSyncService` | ClickUp tasks → `WorkItem` |
+| `WorkItemService` | Provider-neutral work-item reads for Overview / AI |
+| `AskService` | Cited reports via `AIService` + curated failover; persists `ask_reports` |
+| `IntegrationService` | Canonical catalog ∪ user `integrations` + `sync_events` |
+| `OrchestrationService` | n8n-driven multi-provider sync + brief/digest regenerate |
 | `SettingsService` | Profile from `User`; demo preferences curated; non-demo preferences on `User.preferences` |
 
 Shared infrastructure: `db_fallback.py` (empty-table + `SQLAlchemyError` fallback with session rollback), `mapping_utils.py` (id/JSONB/relative-time helpers), `demo_user.py` (demo tenant + `AUTH_REQUIRED=false` fallback). Domain services take `(db, user)` and own their tables; cross-domain reads always go through the owning service, never through another service's mock collection.
@@ -89,6 +107,8 @@ Demo mode: with `AUTH_REQUIRED=false` (default), missing Bearer credentials reso
 |-------|---------|
 | `User` | Executive profile, optional password hash, briefing preferences |
 | `RefreshToken` | Hashed opaque refresh tokens (revocable, rotating) |
+| `OAuthState` | CSRF state for Authorization Code Flow |
+| `OAuthLoginTicket` | One-time ticket after OAuth callback redirect |
 | `MorningBrief` | One generated briefing — backs `GET /morning-brief` (Phase 7 of the migration, the final one) |
 | `BriefAction` | Checklist item — the only brief state the user edits — backs `PATCH /morning-brief/checklist/{item_id}` (Phase 7) |
 | `Meeting` | Calendar event plus generated preparation — backs `GET /meetings` (Phase 2 of the migration) |
@@ -97,6 +117,13 @@ Demo mode: with `AUTH_REQUIRED=false` (default), missing Bearer credentials reso
 | `Integration` | Connected provider, scopes and tokens — backs `GET /integrations` (Phase 5 of the migration) |
 | `SyncEvent` | Sync audit trail — backs `syncHistory` on `GET /integrations` |
 | `DailyBrief` | Overview summary slice — `summary`/`priorities`/`risks` (+ reserved `recommendations`/`executive_score`) |
+| `AskReport` | Persisted Ask Briefly answers (conversation history) |
+
+## OpenAI
+
+Set `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, `OPENAI_EMBED_MODEL`, `OPENAI_TIMEOUT_SECONDS`). Services never call OpenAI HTTP directly — they use `AIService`, which wraps `app/integrations/openai.py` (Responses API).
+
+When the key is missing, or the provider times out / rate-limits / returns malformed JSON, every capability falls back to the existing curated/`demo_data` behaviour. Today's `MorningBrief` row is the generation cache; `POST /morning-brief/regenerate` forces a new call.
 
 ## Local Setup / Developer Onboarding
 
@@ -150,9 +177,12 @@ Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 1. PostgreSQL plugin + Python service pointing at `backend/`.
 2. Environment: `DATABASE_URL`, `CORS_ORIGINS`, `ENVIRONMENT=production`, `DEBUG=false`, a strong `SECRET_KEY`, and usually `AUTH_REQUIRED=true`.
-3. Deploy hook: `alembic upgrade head` (applies through `004`).
+3. Deploy hook: `alembic upgrade head` (applies through `012`).
 4. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. One-time seed (or CI step): `python3 scripts/seed.py`
+6. Optional: `OPENAI_API_KEY` for live generation (blank = curated failover). OpenAI is API-key based — Integrations shows Configured / API key required (never an OAuth Connect flow).
+7. Optional: `NOTION_CLIENT_*`, `GHL_CLIENT_*`, `MONDAY_CLIENT_*`, `CLICKUP_CLIENT_*`, `N8N_WEBHOOK_SECRET` (shared webhook secret — not OAuth).
+8. For Google Calendar/Gmail sync, enable Calendar API and Gmail API in the Google Cloud Console project that owns `GOOGLE_CLIENT_ID`.
 
 If an environment was previously stamped `001` on Atlas tables, `003` aligns it without rewriting revision history — see [docs/migrations.md](../docs/migrations.md).
 
@@ -160,11 +190,13 @@ If an environment was previously stamped `001` on Atlas tables, `003` aligns it 
 
 | Provider | Service | Target |
 |----------|---------|--------|
-| Google Calendar | `MeetingService` | v1.1 |
-| Gmail | `InboxService`, `MorningBriefService` | v1.2 |
-| OpenAI | `MorningBriefService`, `AskService` | v1.3 |
-| GoHighLevel | `CRMService` | v1.4 |
-| Notion | `OverviewService`, `MorningBriefService` | v1.4 |
-| n8n | Scheduled generation | v1.5 |
+| Google Calendar | `MeetingService` | v1.1 (sync done) |
+| Gmail | `InboxService`, `MorningBriefService` | v1.2 (sync done) |
+| OpenAI | `AIService` → Brief / Meetings / Inbox / Ask | v1.0.5 (done) |
+| Notion | `NotionSyncService` → Overview / Morning Brief / Ask | v1.0.6 (done) |
+| GoHighLevel | `GHLSyncService` → `CRMService` / AI | v1.4 (done) |
+| n8n | `OrchestrationService` webhooks | v1.5 (done) |
+| monday.com | `MondaySyncService` → `WorkItemService` / AI | v1.6 (done) |
+| ClickUp | `ClickUpSyncService` → `WorkItemService` / AI | v1.6 (done) |
 
 See [docs/roadmap.md](../docs/roadmap.md).

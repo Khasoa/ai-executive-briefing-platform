@@ -12,7 +12,11 @@ from app.db.base import Base
 
 class Meeting(Base):
     __tablename__ = "meetings"
-    __table_args__ = (Index("ix_meetings_user_starts_at", "user_id", "starts_at"),)
+    __table_args__ = (
+        Index("ix_meetings_user_starts_at", "user_id", "starts_at"),
+        # Partial unique index created in migration 006:
+        # uq_meetings_user_external ON (user_id, external_id) WHERE external_id IS NOT NULL
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

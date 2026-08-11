@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom"
 import {
   CalendarClock,
+  CalendarRange,
   Inbox,
   LayoutGrid,
   MessagesSquare,
@@ -9,15 +10,16 @@ import {
   Sun,
   Target,
 } from "lucide-react"
-import { Avatar } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Logo } from "@/components/layout/Logo"
+import { UserMenu } from "@/components/layout/UserMenu"
 import { cn } from "@/lib/utils"
 
 /** The whole product. Anything that does not serve the brief is not here. */
 const PRIMARY_NAV = [
   { to: "/", label: "Overview", icon: LayoutGrid, end: true },
   { to: "/morning-brief", label: "Morning Brief", icon: Sun, highlight: true },
+  { to: "/weekly-digest", label: "Weekly Digest", icon: CalendarRange },
   { to: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" },
   { to: "/meetings", label: "Meetings", icon: CalendarClock, badge: "meetings" },
   { to: "/crm", label: "CRM", icon: Target, badge: "crm" },
@@ -133,15 +135,14 @@ export function Sidebar({ workspace }) {
 
       <div className="border-t border-border p-3">
         {user ? (
-          <div className="flex items-center gap-2.5 px-1 max-lg:justify-center max-lg:px-0">
-            <Avatar initials={user.avatar} size="md" tone="primary" />
-            <div className="min-w-0 flex-1 max-lg:hidden">
-              <p className="truncate text-[13px] font-medium leading-tight">{user.fullName}</p>
-              <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                {user.role}
-              </p>
+          <>
+            <div className="max-lg:hidden">
+              <UserMenu user={user} />
             </div>
-          </div>
+            <div className="lg:hidden">
+              <UserMenu user={user} compact />
+            </div>
+          </>
         ) : (
           <div className="flex items-center gap-2.5 px-1">
             <Skeleton className="h-8 w-8 rounded-full" />

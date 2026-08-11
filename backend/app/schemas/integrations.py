@@ -1,8 +1,17 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-IntegrationStatus = Literal["connected", "syncing", "not-connected", "error"]
+# Additive statuses: configured = env/API-key ready (OpenAI/n8n).
+IntegrationStatus = Literal[
+    "connected",
+    "syncing",
+    "not-connected",
+    "error",
+    "configured",
+]
+
+AuthType = Literal["oauth", "api_key", "webhook", "derived"]
 
 
 class IntegrationMetricSchema(BaseModel):
@@ -22,6 +31,13 @@ class IntegrationSchema(BaseModel):
     scopes: list[str]
     metrics: list[IntegrationMetricSchema]
     poweredBy: str
+    # Additive fields — older clients ignore unknown JSON; OpenAPI documents them.
+    authType: AuthType = "oauth"
+    statusDetail: str | None = None
+    canSync: bool = True
+    canConnect: bool = True
+    canDisconnect: bool = False
+    canCheck: bool = False
 
 
 class SyncEventSchema(BaseModel):
@@ -39,3 +55,13 @@ class IntegrationsResponse(BaseModel):
     totalCount: int
     integrations: list[IntegrationSchema]
     syncHistory: list[SyncEventSchema]
+
+
+class IntegrationCheckResponse(BaseModel):
+    id: str
+    configured: bool
+    status: IntegrationStatus
+    message: str
+    authType: AuthType
+    # Never includes secrets or API keys.
+    details: dict[str, str | bool | int] = Field(default_factory=dict)

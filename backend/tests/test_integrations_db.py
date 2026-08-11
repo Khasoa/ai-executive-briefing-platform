@@ -136,9 +136,12 @@ def test_integrations_are_returned_from_postgres_when_rows_exist(monkeypatch):
     data = response.json()
 
     ids = {i["id"] for i in data["integrations"]}
-    assert ids == {"database-provider", "second-database-provider"}
-    assert data["totalCount"] == 2
-    assert data["connectedCount"] == 1
+    # Canonical catalog is always present; extra user-owned rows are appended.
+    assert "google-calendar" in ids
+    assert "gmail" in ids
+    assert "notion" in ids
+    assert {"database-provider", "second-database-provider"}.issubset(ids)
+    assert data["totalCount"] >= len(ids)
 
     first = next(i for i in data["integrations"] if i["id"] == "database-provider")
     assert first["name"] == "Database Provider"
@@ -155,8 +158,10 @@ def test_integrations_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in demo_data.INTEGRATIONS}
-    assert data["totalCount"] == len(demo_data.INTEGRATIONS)
+    assert {i["id"] for i in demo_data.INTEGRATIONS}.issubset(
+        {i["id"] for i in data["integrations"]}
+    )
+    assert data["totalCount"] >= len(demo_data.INTEGRATIONS)
     assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 
@@ -167,7 +172,10 @@ def test_integrations_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in demo_data.INTEGRATIONS}
+    # Demo user still gets the curated catalog overlay; sync history falls back.
+    assert {i["id"] for i in demo_data.INTEGRATIONS}.issubset(
+        {i["id"] for i in data["integrations"]}
+    )
     assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 

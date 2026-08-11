@@ -93,6 +93,10 @@ class AuthService:
             record.revoked_at = datetime.now(timezone.utc)
             self.db.commit()
 
+    def issue_tokens(self, user: User) -> TokenResponse:
+        """Public wrapper used by OAuth and other identity providers."""
+        return self._issue_tokens(user)
+
     def resolve_access_token(self, token: str) -> User:
         payload = decode_access_token(token, self.settings)
         try:

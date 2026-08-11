@@ -116,6 +116,42 @@ INTEGRATIONS = [
         },
     ),
     dict(
+        provider="monday",
+        status="not-connected",
+        account=None,
+        scopes=["me:read", "boards:read", "workspaces:read"],
+        last_sync_at=None,
+        connected_at=None,
+        config={
+            "name": "monday.com",
+            "category": "Work management",
+            "description": "Boards, tasks and deadlines that show what needs executive attention.",
+            "metrics": [
+                {"label": "Items synced", "value": "—"},
+                {"label": "Boards", "value": "—"},
+            ],
+            "poweredBy": "monday.com API",
+        },
+    ),
+    dict(
+        provider="clickup",
+        status="not-connected",
+        account=None,
+        scopes=["workspace.read", "tasks.read"],
+        last_sync_at=None,
+        connected_at=None,
+        config={
+            "name": "ClickUp",
+            "category": "Work management",
+            "description": "Tasks, priorities and owners across authorized ClickUp workspaces.",
+            "metrics": [
+                {"label": "Tasks synced", "value": "—"},
+                {"label": "Workspaces", "value": "—"},
+            ],
+            "poweredBy": "ClickUp API",
+        },
+    ),
+    dict(
         provider="openai",
         status="connected",
         account="Organisation · arcadia-systems",

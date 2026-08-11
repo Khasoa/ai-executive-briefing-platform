@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { Link } from "react-router-dom"
 import {
   AlertTriangle,
   CalendarClock,
+  CalendarRange,
   Check,
   Inbox,
   Loader2,
@@ -96,6 +98,13 @@ function BriefMasthead({ meta, preparedFor, onRegenerate, regenerating, onRefres
         {meta.sources.map((source) => (
           <SourceChip key={source} source={source} />
         ))}
+        <Link
+          to="/weekly-digest"
+          className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground no-print"
+        >
+          <CalendarRange className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+          Review this week&apos;s activity
+        </Link>
       </div>
     </motion.header>
   )

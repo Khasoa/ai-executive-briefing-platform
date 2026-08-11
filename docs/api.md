@@ -8,6 +8,16 @@ Field values marked *signal* use one shared vocabulary across the whole API: `cr
 
 Sources cited by the AI are one of: `Gmail`, `Google Calendar`, `GoHighLevel`, `Notion`, `OpenAI`, `n8n`.
 
+Generation uses OpenAI when `OPENAI_API_KEY` is set (`OPENAI_MODEL`, `OPENAI_EMBED_MODEL`, `OPENAI_TIMEOUT_SECONDS` optional). API response contracts do not change when the key is absent — curated failover keeps the same shapes.
+
+Notion OAuth uses `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, and `NOTION_REDIRECT_URI`. When unset, Notion start returns `503` and Overview / Brief / Ask keep their pre-Notion behaviour. Connect Notion while signed in so the workspace bot links to your Briefly user.
+
+GoHighLevel OAuth uses `GHL_CLIENT_ID`, `GHL_CLIENT_SECRET`, and `GHL_REDIRECT_URI` (Marketplace Location app). When unset, GHL start returns `503`. Sync via `POST /integrations/gohighlevel/sync`.
+
+n8n calls `POST /webhooks/n8n/*` with header `X-Briefly-N8N-Secret` matching `N8N_WEBHOOK_SECRET`. Unconfigured secret → `503`; wrong secret → `401`. See [automation/n8n-daily-brief.md](../automation/n8n-daily-brief.md).
+
+monday.com OAuth uses `MONDAY_CLIENT_ID`, `MONDAY_CLIENT_SECRET`, `MONDAY_REDIRECT_URI`. ClickUp uses `CLICKUP_CLIENT_ID`, `CLICKUP_CLIENT_SECRET`, `CLICKUP_REDIRECT_URI`. Sync via `POST /integrations/monday/sync` and `POST /integrations/clickup/sync` into `work_items`. Connect while signed in.
+
 ---
 
 ## Health
@@ -85,6 +95,117 @@ Revokes the refresh token. Status `204`. Body: `{ "refreshToken": "…" }`.
 ### `GET /auth/me`
 
 Current user. With Bearer → that user. Without Bearer and `AUTH_REQUIRED=false` → demo user.
+
+---
+
+## OAuth providers
+
+Provider routes are generic: `/auth/oauth/{provider}/…` for `google`, `notion`, `gohighlevel`, `monday`, and `clickup`.
+
+## Google OAuth
+
+Identity + Calendar/Gmail scopes via Authorization Code Flow.
+
+Requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`. When unset, start returns `503` and the portfolio demo continues to work without Google (`AUTH_REQUIRED=false`).
+
+Scopes requested today: `openid`, `email`, `profile`, `calendar.readonly`, and `gmail.readonly`.
+
+Existing Google connections granted before Calendar/Gmail sync must reconnect once to pick up the new scopes.
+
+### `GET /auth/oauth/google/start`
+
+Returns the Google authorize URL and CSRF `state`. Optional `Authorization: Bearer` links the eventual Google account to the already-authenticated user.
+
+```json
+{
+  "provider": "google",
+  "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?…",
+  "state": "…"
+}
+```
+
+### `GET /auth/oauth/google/callback`
+
+Google redirects here with `?code=&state=`. Verifies state (single-use), exchanges the code, loads the Google profile, find-or-creates a `User`, stores encrypted provider tokens on `integrations` (`provider=google`), and issues the same Briefly JWT + refresh token response as password login.
+
+If `OAUTH_SUCCESS_REDIRECT` is set, responds with `302` to that URL with `?ticket=…&provider=google` instead of JSON.
+
+### `POST /auth/oauth/google/exchange`
+
+Exchanges a one-time callback ticket for `TokenResponse`.
+
+```json
+{ "ticket": "…" }
+```
+
+### `GET /auth/oauth/google/status`
+
+Connection status for the current user (Bearer or demo fallback).
+
+### `POST /auth/oauth/google/refresh`
+
+Refreshes the **Google** access token (not the Briefly JWT). Returns `{ "provider": "google", "accessToken": "…" }`.
+
+### `POST /auth/oauth/google/disconnect`
+
+Clears stored Google tokens for the current user.
+
+## Notion OAuth
+
+Workspace bot Authorization Code Flow. Connect while signed in so the bot links to your Briefly user (Notion may not expose a person email).
+
+Requires `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, and `NOTION_REDIRECT_URI`. When unset, start returns `503`. Tokens are long-lived (`expires_at` null); `POST /auth/oauth/notion/refresh` returns the stored access token without calling Notion.
+
+Same route shapes as Google (`/start`, `/callback`, `/exchange`, `/status`, `/refresh`, `/disconnect`) with `provider=notion`. Callback stores encrypted tokens on `Integration(provider=notion)`. Sync via `POST /integrations/notion/sync`.
+
+## GoHighLevel OAuth
+
+Marketplace Authorization Code Flow (Location token). Connect while signed in so the location links to your Briefly user (synthetic `@users.gohighlevel.local` emails do not auto-provision users).
+
+Requires `GHL_CLIENT_ID`, `GHL_CLIENT_SECRET`, and `GHL_REDIRECT_URI`. When unset, start returns `503`. Tokens are Fernet-encrypted on `Integration(provider=gohighlevel)`. Location id / user id from the token payload are stored under `integrations.config.ghl`.
+
+Same route shapes as Google with `provider=gohighlevel`. Sync via `POST /integrations/gohighlevel/sync` → `GHLSyncService` upserts `Opportunity` rows (`external_id=ghl:{opportunityId}`), preserves local AI/risk/preparation fields, and marks missing open deals closed.
+
+CRM intelligence (`crm_intelligence.derive_crm_signals`) derives at-risk / stale / upcoming-close / follow-up / high-value signals from synced rows for AI context — never invents CRM facts.
+
+## monday.com OAuth
+
+Authorization Code Flow via `https://auth.monday.com/oauth2/authorize`. Connect while signed in. Scopes: `me:read`, `boards:read`, `workspaces:read`, `account:read`. Tokens are Fernet-encrypted on `Integration(provider=monday)` and currently long-lived (no refresh). Sync: `POST /integrations/monday/sync` → `MondaySyncService` upserts `WorkItem` rows (`external_id=monday:{itemId}`), preserves `intelligence`, archives missing items on full sync.
+
+## ClickUp OAuth
+
+Authorization Code Flow via `https://app.clickup.com/api`. Users select Workspaces at consent (no granular scopes). Tokens are Fernet-encrypted on `Integration(provider=clickup)` and currently do not expire. Sync: `POST /integrations/clickup/sync` → `ClickUpSyncService` upserts `WorkItem` rows (`external_id=clickup:{taskId}`), incremental via `date_updated_gt` watermark, preserves `intelligence`.
+
+---
+
+## n8n orchestration webhooks
+
+Secret-authenticated. No user JWT. Header:
+
+```http
+X-Briefly-N8N-Secret: <N8N_WEBHOOK_SECRET>
+```
+
+### `POST /webhooks/n8n/run`
+
+```json
+{
+  "userEmail": "lydia@arcadiasystems.com",
+  "providers": ["google-calendar", "gmail", "notion", "gohighlevel"],
+  "regenerateMorningBrief": false,
+  "regenerateWeeklyDigest": false
+}
+```
+
+Each provider sync is isolated (`success` / `skipped` / `error`). One failure does not abort the others.
+
+### `POST /webhooks/n8n/daily`
+
+Syncs all providers + regenerates Morning Brief.
+
+### `POST /webhooks/n8n/weekly`
+
+Syncs all providers + regenerates Weekly Digest.
 
 ---
 
@@ -348,6 +469,7 @@ Creates today's `MorningBrief` row if one does not exist yet, or replaces its re
 
 ### `PATCH /morning-brief/checklist/{item_id}`
 
+
 Marks a checklist item complete or incomplete. This is the only brief state the executive edits directly.
 
 **Request:** `{ "done": true }`
@@ -358,9 +480,81 @@ Updates the `BriefAction` row in PostgreSQL (setting `completedAt` when marked d
 
 ---
 
+## Weekly Digest (Weekly Intelligence & Next Week Outlook)
+
+Cross-system memory + forward outlook from **user-scoped persisted rows** only (Gmail `Email`, Google Calendar `Meeting`, GHL `Opportunity`, Notion `NotionItem`, monday/ClickUp `WorkItem`). Complements the Morning Brief (today) — it does not replace it.
+
+Generation goes `WeeklyDigestService → AIService → OpenAIClient`. Cached per user on `(user_id, week_start)`. Sources with zero synced rows are omitted (connected ≠ usable). Demo curated content is never returned for authenticated non-demo users. When OpenAI is unavailable or fewer than 3 cross-system signals exist, a curated fallback is returned with `generatedBy: "curated"`. Email bodies are not stored — if only subject/metadata exists, `dataCoverage.emailNote` states the limited view.
+
+### `GET /weekly-digest`
+
+Returns the cached digest for the current rolling week, generating one if missing.
+
+```json
+{
+  "id": "…",
+  "weekStart": "2026-08-02",
+  "weekEnd": "2026-08-08",
+  "weekLabel": "Aug 2 – 8, 2026",
+  "headline": "…",
+  "summary": "…",
+  "weekSummary": "…",
+  "importantConversations": [
+    {
+      "id": "…",
+      "title": "…",
+      "detail": "…",
+      "source": "Gmail",
+      "emailIds": ["…"],
+      "kind": "fact"
+    }
+  ],
+  "decisionsAndApprovals": [],
+  "followUps": [],
+  "unresolvedItems": [],
+  "notableActivity": [],
+  "carryIntoNextWeek": [],
+  "nextWeekOutlook": {
+    "upcomingMeetings": [],
+    "upcomingDeadlines": [],
+    "overdueWork": [],
+    "crmAttention": [],
+    "emailFollowUps": [],
+    "workItems": [],
+    "carryForward": [],
+    "recommendedPriorities": [],
+    "risksAndWatchouts": [],
+    "workloadSignals": []
+  },
+  "planningNote": "…",
+  "confidence": "high",
+  "generatedBy": "openai",
+  "sources": ["Gmail", "Google Calendar", "OpenAI"],
+  "emailCount": 12,
+  "dataCoverage": {
+    "emailCount": 12,
+    "emailSummariesAvailable": true,
+    "emailNote": "",
+    "meetingCount": 3,
+    "opportunityCount": 1,
+    "workItemCount": 4,
+    "notionItemCount": 0,
+    "sourcesWithData": ["Gmail", "Google Calendar", "GoHighLevel"]
+  },
+  "generatedAt": "2026-08-08T10:00:00+00:00",
+  "generatedLabel": "just now"
+}
+```
+
+### `POST /weekly-digest/regenerate`
+
+Forces a fresh digest for the current week window (overwrites the cached row).
+
+---
+
 ## Inbox
 
-**Partial PostgreSQL migration (Phase 3):** `emails` (and the per-category `count`s derived from them) are read from the `emails` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. `summary` is a separate aggregate stat, not derived from the email list, so it always comes from curated data for now. Same fallback shape as `MeetingService`'s Phase 2 migration; see `InboxService.list_emails()` for the mechanics. Seed data with `backend/scripts/seed_emails.py`.
+**PostgreSQL + Gmail:** emails are read from the `emails` table when rows exist for the current user, and fall back to curated data otherwise. When Google is connected, `GmailSyncService` writes messages into `Email` (`external_id=gmail:{messageId}`) with Gmail labels and thread ids — no AI summarisation. `InboxService` is unchanged. `summary` remains curated aggregate stats for now. Seed curated rows with `backend/scripts/seed_emails.py`.
 
 ### `GET /inbox`
 
@@ -415,7 +609,7 @@ Summarised threads grouped into executive categories.
 
 ## Meetings
 
-**Partial PostgreSQL migration (Phase 2):** meetings are read from the `meetings` table when rows exist there, and fall back to curated data otherwise — including if the database itself is unreachable. Same fallback shape as `/overview`'s Phase 1 migration; see `MeetingService.list_meetings()` for the mechanics. Seed data with `backend/scripts/seed_meetings.py`.
+**PostgreSQL + Google Calendar:** meetings are read from the `meetings` table when rows exist for the current user, and fall back to curated data otherwise (demo user / empty table / DB unreachable). When Google is connected, `CalendarSyncService` writes primary-calendar events into `Meeting` (`external_id=primary:{eventId}`); `MeetingService` is unchanged. Seed curated rows with `backend/scripts/seed_meetings.py`.
 
 ### `GET /meetings`
 
@@ -532,6 +726,8 @@ Only opportunities that warrant executive attention, plus pipeline totals.
 
 Suggested executive questions, recent history and the systems currently readable.
 
+`recent` is served from persisted `ask_reports` when present; the demo user falls back to curated recent questions when history is empty. Response shape is unchanged.
+
 ```json
 {
   "suggestions": [
@@ -555,7 +751,7 @@ Suggested executive questions, recent history and the systems currently readable
 
 **Request:** `{ "question": "Which deals are most at risk?" }` (1–500 characters)
 
-**Response 200:** a cited report, never a chat message.
+**Response 200:** a cited report, never a chat message. Generated via `AIService` when OpenAI is available; otherwise the curated report library. Every answer is persisted for `GET /ask` recent history when the database is available.
 
 ```json
 {
@@ -594,7 +790,7 @@ Questions that do not match a known report fall back to a generic cited response
 
 ## Integrations
 
-**PostgreSQL persistence:** `integrations` (and `connectedCount`/`totalCount`) come from the `integrations` table; `syncHistory` comes from `sync_events`. Both fall back to curated data when empty or unreachable. Manual sync (`POST /integrations/{id}/sync`) updates the Integration row and inserts a `SyncEvent` when persistence is available. See `IntegrationService.list_integrations()` / `list_sync_history()`. Seed with `backend/scripts/seed_integrations.py` then `seed_sync_events.py`. No OAuth tokens are stored yet — `config` only carries display metadata.
+**PostgreSQL persistence:** `GET /integrations` always returns the canonical supported-provider catalog (Google Calendar, Gmail, Notion, GoHighLevel, monday.com, ClickUp, OpenAI, n8n) merged with the *current user's* `integrations` rows. Connection status, account, and last-sync metadata come only from that user's rows — never from another user. Providers without a user row appear as `not-connected`. Demo users may still overlay curated `demo_data` connection state when they lack a row. `syncHistory` comes from the user's `sync_events` (demo fallback when empty/unreachable). OAuth tokens stay Fernet-encrypted on `Integration.config.oauth` and are never returned in this payload. Manual sync routes unchanged. Seed with `backend/scripts/seed_integrations.py` then `seed_sync_events.py`.
 
 ### `GET /integrations`
 
@@ -637,10 +833,32 @@ Questions that do not match a known report fall back to a generic cited response
 
 ### `POST /integrations/{integration_id}/sync`
 
-Triggers a manual read and appends a `running` entry to the audit trail. Returns the full `GET /integrations` payload so the caller gets both the new connection state and the new history entry.
+Triggers a manual read and appends history. Returns the full `GET /integrations` payload.
+
+For `google-calendar` / `gmail` / `google` when Google OAuth is connected: runs incremental Calendar and/or Gmail sync into `Meeting` / `Email` (idempotent upsert, deletes removed items, preserves local AI/prep fields when set).
+
+For `notion` when Notion OAuth is connected: runs incremental Notion sync into `NotionItem` (search + selected databases, watermark on `last_edited_time`, archives deleted pages, preserves `intelligence`).
+
+For `gohighlevel` when GHL OAuth is connected: runs opportunity sync into `Opportunity` (open/won/lost/abandoned, idempotent `external_id`, preserves AI/risk fields, closes missing open deals).
+
+For `monday` / `clickup` when connected: runs work-item sync into `WorkItem` (idempotent upsert, archive missing on full sync, preserves `intelligence`).
 
 - **404** — unknown integration
-- **409** — the integration is not connected yet
+- **409** — not connected, or required scope missing (reconnect Google / Notion / GoHighLevel / monday / ClickUp)
+
+### `POST /webhooks/google/calendar`
+
+Google Calendar push notifications. Always returns `204`.
+
+Headers: `X-Goog-Channel-ID`, `X-Goog-Resource-State`, `X-Goog-Resource-ID`.
+
+The initial `sync` handshake is acknowledged without pulling events. Later notifications trigger the same incremental sync path as manual sync. Optional watch registration: set `GOOGLE_CALENDAR_WEBHOOK_URL` and call `CalendarSyncService.ensure_watch(user)`.
+
+### `POST /webhooks/google/gmail`
+
+Gmail Pub/Sub push notifications. Always returns `204`.
+
+Body: standard Pub/Sub envelope; decoded `data` JSON includes `emailAddress` and optional `historyId`. Optional watch: set `GMAIL_PUBSUB_TOPIC` and call `GmailSyncService.ensure_watch(user)`.
 
 ---
 
@@ -649,6 +867,8 @@ Triggers a manual read and appends a `running` entry to the audit trail. Returns
 ### `GET /settings`
 
 Returns `profile`, `preferences`, `notifications`, `security`, `theme` and `connectedAccounts`.
+
+Authenticated users receive their PostgreSQL `User` profile (not `demo_data.USER`). `profile.hasPassword` / `security.hasPassword` indicate whether password change is available (false for Google-only accounts with `hashed_password = NULL`).
 
 ```json
 {
@@ -659,7 +879,8 @@ Returns `profile`, `preferences`, `notifications`, `security`, `theme` and `conn
     "email": "lydia@arcadiasystems.com",
     "phone": "+30 210 555 0148",
     "timezone": "Europe/Athens (GMT+3)",
-    "avatar": "LK"
+    "avatar": "LK",
+    "hasPassword": true
   },
   "preferences": {
     "briefTime": "06:30",
@@ -738,6 +959,32 @@ Partial update; omitted fields are left unchanged. Returns the full preferences 
 ### `PATCH /settings/notifications/{notification_id}`
 
 **Request:** `{ "enabled": false }` — returns the updated notification. **404** if unknown.
+
+### `PATCH /settings/profile` (implemented)
+
+Updates `fullName`, `role`, `company`, `timezone`, and `avatar` (initials string only — no photo upload). Persists to PostgreSQL `users`. Returns `UserSchema` (same shape as `GET /auth/me`). AuthContext/UserMenu/Settings should refresh from this response without a full reload.
+
+```json
+{
+  "fullName": "Lydia Real",
+  "role": "CEO",
+  "company": "Real Systems",
+  "timezone": "Europe/Athens",
+  "avatar": "LR"
+}
+```
+
+### `POST /settings/password` (implemented for password accounts)
+
+Requires `currentPassword` + `newPassword` (min 8). Hashes with bcrypt. Revokes **all** refresh tokens for the user. Returns `{ "ok": true, "message": "…" }`. Google/OAuth-only users (`hashed_password` null) receive **400** — they can edit profile without creating a password.
+
+### Intentionally deferred (Settings)
+
+- Profile photo file storage / upload
+- Session/device revoke UI (beyond password-driven refresh revocation)
+- Personal API key management
+- Two-factor authentication
+- Density / accent / reduce-motion persistence
 
 ---
 

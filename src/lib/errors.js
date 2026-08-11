@@ -27,10 +27,17 @@ export function classifyError(error) {
   }
 
   if (status != null && status >= 500) {
+    // Prefer actionable provider messages (e.g. Google API not enabled → often 502/409).
+    const looksProvider =
+      /google|gmail|calendar|notion|openai|n8n|clickup|monday|gohighlevel|reconnect|api key|webhook|sync failed/i.test(
+        message,
+      )
     return {
       kind: "server",
       title: "Something went wrong on our side",
-      message: "Briefly hit a server error. Wait a moment, then try again.",
+      message: looksProvider
+        ? message
+        : "Briefly hit a server error. Wait a moment, then try again.",
       detail: message,
     }
   }
@@ -49,6 +56,21 @@ export function classifyError(error) {
       kind: "conflict",
       title: "That action is not available yet",
       message: message || "The system is not ready for this action.",
+      detail: message,
+    }
+  }
+
+  if (status === 401 || status === 403) {
+    const looksProvider =
+      /google|gmail|calendar|notion|openai|n8n|clickup|monday|gohighlevel|reconnect|permission|scope/i.test(
+        message,
+      )
+    return {
+      kind: "auth",
+      title: looksProvider ? "Authorization needed" : "Sign in required",
+      message: looksProvider
+        ? message
+        : message || "Your session expired. Sign in again to continue.",
       detail: message,
     }
   }

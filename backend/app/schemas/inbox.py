@@ -8,6 +8,9 @@ EmailCategory = Literal[
     "waiting",
     "delegated",
     "informational",
+    "promotional",
+    "newsletter",
+    "automated",
 ]
 
 

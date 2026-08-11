@@ -198,3 +198,151 @@ def get_pipeline(
 - Flip `AUTH_REQUIRED=true` to require a Bearer token on protected routes
 
 **Google OAuth later:** exchange the Google code → find-or-create `User` by email (or link table) → issue the same `TokenResponse`. Calendar/Gmail scopes land on `Integration` rows owned by that user.
+
+---
+
+## ADR-016: OAuth providers behind a shared abstraction
+
+**Decision:** Authorization Code Flow is implemented once as `OAuthProvider` (`app/integrations/oauth/`). Google is the first concrete provider. Provider tokens are Fernet-encrypted inside `integrations.config`; CSRF state and frontend login tickets are first-class tables.
+
+**Why:**
+- Microsoft / Notion / GoHighLevel can register the same interface without touching auth routes
+- Encrypted-at-rest tokens keep secrets out of plaintext JSONB dumps
+- Briefly JWT issuance stays in `AuthService.issue_tokens` so password and OAuth share one session model
+- Auth-only Google scopes (`openid email profile`) keep Calendar/Gmail sync out of this phase
+
+**How it shows up:**
+- `GET /auth/oauth/{provider}/start|callback`, ticket exchange, status, provider refresh, disconnect
+- `Integration(provider="google")` stores encrypted oauth + profile metadata for later sync modules
+- Unconfigured Google credentials → `503` on start; demo mode unchanged
+
+---
+
+## ADR-017: Calendar sync writes Meetings; MeetingService stays read-only
+
+**Decision:** `CalendarSyncService` owns Google → `Meeting` persistence. `MeetingService` continues to read `meetings` with demo fallback. Sync is incremental (`syncToken`), idempotent (`external_id`), preserves local prep/intelligence, and is webhook-ready via `POST /webhooks/google/calendar`.
+
+**Why:**
+- Avoids redesigning the Meetings API contract
+- Demo mode keeps working when no synced rows exist
+- Push notifications and manual `POST /integrations/google-calendar/sync` share one apply path
+- Cancelled Google events delete the matching Meeting so the UI never shows ghosts
+
+**How it shows up:**
+- Tokens from `Integration(provider=google)`; sync cursor / channel on `config.calendar`
+- UI row `google-calendar` mirrored for status + sync history
+- Partial unique index `uq_meetings_user_external`
+
+---
+
+## ADR-018: Gmail sync writes Emails; InboxService stays read-only
+
+**Decision:** `GmailSyncService` owns Gmail → `Email` persistence. `InboxService` continues to read `emails` with demo fallback. Sync is incremental (`historyId`), idempotent (`external_id=gmail:{messageId}`), stores provider labels, and does not call AI.
+
+**Why:**
+- Avoids redesigning the Inbox API contract
+- Demo mode keeps working when no synced rows exist
+- Labels and message ids come from Gmail; local AI fields stay empty until a later phase
+- Pub/Sub webhook and manual `POST /integrations/gmail/sync` share one apply path
+
+**How it shows up:**
+- Tokens from `Integration(provider=google)`; cursor on `config.gmail.history_id`
+- UI row `gmail` mirrored for status + sync history
+- Partial unique index `uq_emails_user_external`
+- `ai_summary` / `suggested_response` left empty at sync time for `AIService` fill
+
+---
+
+## ADR-019: OpenAI only through AIService, with curated failover
+
+**Decision:** All generation goes `DomainService → AIService → OpenAIClient` (Responses API). `AIService` returns `None` on missing key, timeout, rate limit, unavailability, or malformed JSON so callers keep today's curated/`demo_data` paths. Prompts and JSON schemas live in `ai_prompts.py`. Ask history is persisted in `ask_reports` (migration `008`).
+
+**Why:**
+- One place owns provider errors, schema validation, and prompt construction
+- Demo mode and API contracts stay stable without an API key
+- Caching is explicit (Morning Brief row; non-empty meeting/email AI fields)
+- Manual edits are never overwritten
+
+**How it shows up:**
+- Env: `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_EMBED_MODEL`, `OPENAI_TIMEOUT_SECONDS`
+- Morning Brief cache = today's row; `POST /morning-brief/regenerate` forces refresh
+- `Meeting.intelligence` / email AI fields filled lazily on detail reads when empty
+- `AskService` persists every answer; curated reports remain the failover
+
+---
+
+## ADR-020: Notion through OAuthService + NotionSyncService
+
+**Decision:** Notion uses the same `OAuthProvider` registry as Google. Long-lived workspace bot tokens are Fernet-encrypted on `Integration(provider=notion)`. `NotionSyncService` owns all Notion API I/O via `NotionClient`; routes stay thin. Synced pages land in `notion_items` (migration `009`) with idempotent `(user_id, external_id)` upserts. AI-generated `intelligence` is never overwritten. Incremental sync uses a `last_edited_watermark` in `integrations.config.notion`, plus optional `selected_database_ids`.
+
+**Why:**
+- Reuses encrypted token storage and CSRF/ticket OAuth machinery
+- Notion tokens do not refresh — `OAuthService.refresh_provider_access_token` treats `expires_at=None` as valid
+- Workspace installs must link to an existing Briefly session (synthetic `@users.notion.local` emails do not create users)
+- Disconnected Notion leaves Overview / Morning Brief / Ask contracts unchanged
+
+**How it shows up:**
+- Env: `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `NOTION_REDIRECT_URI`
+- `POST /integrations/notion/sync` → `NotionSyncService`
+- `AIService` context includes outstanding tasks, deadlines, projects, decisions, blocked work
+- Overview surfaces today's tasks, overdue work, recent docs, and project status when Notion items exist
+
+---
+
+## ADR-021: GoHighLevel through OAuthService + GHLSyncService
+
+**Decision:** GoHighLevel uses the shared `OAuthProvider` registry (Marketplace Location Authorization Code Flow). Access/refresh tokens are Fernet-encrypted on `Integration(provider=gohighlevel)`. `GHLSyncService` owns all GHL API I/O via `GHLClient`; routes stay thin. Opportunities upsert into the existing `Opportunity` model with `external_id=ghl:{id}` (migration `011` partial unique index). Local `ai_summary`, `recommended_action`, `risk_level`, and `signals` are never overwritten when already set. Closed/missing open deals are marked closed rather than hard-deleted.
+
+**Why:**
+- Reuses encrypted token storage and CSRF/ticket OAuth machinery
+- Avoids a parallel CRM concept — CRMService / AIService stay the readers
+- AI is not the source of truth for pipeline state; `crm_intelligence` only derives signals from synced fields
+- Disconnected GHL leaves CRM contracts and demo behaviour unchanged
+
+**How it shows up:**
+- Env: `GHL_CLIENT_ID`, `GHL_CLIENT_SECRET`, `GHL_REDIRECT_URI`
+- `POST /integrations/gohighlevel/sync` → `GHLSyncService`
+- Connect while signed in (refuse `@users.gohighlevel.local` auto-provision)
+
+---
+
+## ADR-022: n8n as orchestration only
+
+**Decision:** n8n never contains Briefly business logic. It calls secret-authenticated FastAPI webhooks (`N8N_WEBHOOK_SECRET` via `X-Briefly-N8N-Secret`). `OrchestrationService` runs per-provider sync with failure isolation, then optionally regenerates Morning Brief / Weekly Digest. Unconfigured secret → `503`; bad secret → `401`. No unauthenticated admin endpoints.
+
+**Why:**
+- FastAPI + PostgreSQL remain the system of record
+- One provider outage must not abort Calendar / Gmail / Notion / GHL / brief steps
+- Secrets stay server-side; n8n only holds the shared webhook secret
+
+**How it shows up:**
+- `POST /webhooks/n8n/run|daily|weekly`
+- Docs: `automation/n8n-daily-brief.md`
+
+---
+
+## ADR-024: Integrations page uses a canonical catalog
+
+**Decision:** `GET /integrations` is built from `integration_catalog.SUPPORTED_INTEGRATIONS` merged with the authenticated user's `integrations` rows. Missing providers appear as `not-connected` with catalog display metadata only. Google OAuth (`provider=google`) projects onto both `google-calendar` and `gmail` cards. Demo users may overlay curated `demo_data.INTEGRATIONS` connection state for catalog entries that lack a user row. Real users never receive another user's tokens, accounts, or sync timestamps.
+
+**Why:** New OAuth users previously only saw providers they had already connected, which hid Connect actions for Notion/GHL/monday/ClickUp.
+
+---
+
+## ADR-023: monday.com + ClickUp via shared WorkItem model
+
+**Decision:** monday.com and ClickUp use the shared `OAuthProvider` registry and encrypt tokens on `Integration(provider=monday|clickup)`. Synced tasks land in a provider-neutral `work_items` table (migration `012`) with unique `(user_id, provider, external_id)`. `MondaySyncService` / `ClickUpSyncService` own API I/O; `WorkItemService` is the only read path for Overview / AI / Weekly Digest colour. AI never calls monday/ClickUp directly. Local `intelligence` is preserved on sync. Providers are independently optional.
+
+**Auth:**
+- monday.com: documented OAuth Authorization Code (`auth.monday.com`) with scopes `me:read boards:read workspaces:read account:read`. Legacy long-lived tokens (no refresh) — OAuth 2.1/PKCE deferred until architecture supports code_verifier storage.
+- ClickUp: OAuth Authorization Code (`app.clickup.com/api`); no granular scopes; users pick Workspaces; tokens currently do not expire.
+
+**Why:**
+- Avoids duplicate monday/ClickUp domain models
+- Reuses Fernet token storage and connect-while-signed-in guards
+- Disconnected providers leave Overview / Brief / Ask contracts unchanged
+
+**How it shows up:**
+- Env: `MONDAY_CLIENT_*`, `CLICKUP_CLIENT_*`
+- `POST /integrations/monday/sync`, `POST /integrations/clickup/sync`
+- AI context key `workItems` with source attribution `monday.com` / `ClickUp`

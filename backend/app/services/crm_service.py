@@ -38,7 +38,6 @@ class CRMService:
     def get_pipeline(self) -> CRMResponse:
         opportunities = self.list_opportunities()
         needing_attention = [o for o in opportunities if o["riskLevel"] in _ATTENTION_LEVELS]
-
         return CRMResponse(
             summary={
                 "pipelineValue": sum(o["value"] for o in opportunities),

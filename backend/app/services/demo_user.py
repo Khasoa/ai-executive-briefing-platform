@@ -63,8 +63,9 @@ def settings_profile_dict(user: User) -> dict:
     from app.services import demo_data
 
     phone = demo_data.SETTINGS_PROFILE["phone"] if is_demo_user(user) else ""
-    timezone_label = (
-        demo_data.SETTINGS_PROFILE["timezone"] if is_demo_user(user) else user.timezone
+    # Authenticated users edit the stored IANA timezone; demo keeps the labelled string.
+    timezone_value = (
+        demo_data.SETTINGS_PROFILE["timezone"] if is_demo_user(user) else (user.timezone or "UTC")
     )
     return {
         "fullName": user.full_name,
@@ -72,8 +73,9 @@ def settings_profile_dict(user: User) -> dict:
         "company": user.company,
         "email": user.email,
         "phone": phone,
-        "timezone": timezone_label,
+        "timezone": timezone_value,
         "avatar": user.avatar,
+        "hasPassword": bool(user.hashed_password),
     }
 
 

@@ -102,8 +102,12 @@ def test_overview_prefers_the_database_when_a_brief_exists(monkeypatch):
     assert summary["priorities"][0]["id"] == "pri_db_1"
     assert summary["risks"][0]["id"] == "risk_db_1"
 
-    # Only summary/priorities/risks moved to the database — everything else
-    # in this phase is still demo_data, unaffected by which brief was found.
-    assert len(data["kpis"]) == len(demo_data.KPIS)
-    assert len(data["activity"]) == len(demo_data.ACTIVITY)
-    assert len(data["focus"]) == len(demo_data.TODAYS_FOCUS)
+    # Summary/priorities/risks come from the database brief. KPIs / activity /
+    # focus may come from Notion or WorkItem surfaces when those rows exist.
+    assert len(data["kpis"]) >= 1
+    assert isinstance(data["activity"], list)
+    assert len(data["focus"]) >= 1
+    assert all(
+        item.get("type") in ("email", "deal", "document", "meeting", "task")
+        for item in data["activity"]
+    )

@@ -43,3 +43,7 @@ class User(Base):
     opportunities: Mapped[list["Opportunity"]] = relationship(back_populates="user")
     integrations: Mapped[list["Integration"]] = relationship(back_populates="user")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
+    ask_reports: Mapped[list["AskReport"]] = relationship(back_populates="user")
+    notion_items: Mapped[list["NotionItem"]] = relationship(back_populates="user")
+    work_items: Mapped[list["WorkItem"]] = relationship(back_populates="user")
+    weekly_digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user")

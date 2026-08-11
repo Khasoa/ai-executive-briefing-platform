@@ -30,7 +30,7 @@ ai-executive-partner/
 │   └── api/              # HTTP client + one module per backend domain
 ├── backend/              # FastAPI backend
 ├── docs/                 # Architecture, API and decision records
-├── automation/           # n8n workflow definitions (future)
+├── automation/           # n8n orchestration docs / workflow notes
 └── assets/               # Screenshots and demo assets
 ```
 
@@ -46,6 +46,7 @@ ai-executive-partner/
 |-------|---------|
 | `/` | Executive dashboard: summary, KPIs, activity, today's focus |
 | `/morning-brief` | The full briefing, formatted as a printable executive report |
+| `/weekly-digest` | Weekly email memory + next-week planning |
 | `/inbox` | Intelligent email summaries, not a raw message list |
 | `/meetings` | Meeting intelligence: context, talking points, questions, risks |
 | `/crm` | Only the opportunities that need executive attention |
@@ -87,14 +88,15 @@ cp .env.example .env    # VITE_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:5173](http://localhost:5173). Unauthenticated visitors land on `/login`. For Google, Notion, or GoHighLevel OAuth in the browser, set backend `OAUTH_SUCCESS_REDIRECT=http://localhost:5173/oauth/callback`.
 
-No page holds its own copy of server data — every view is rendered from an API response through `src/api/` (one module per backend domain).
+No page holds its own copy of server data — every view is rendered from an API response through `src/api/` (one module per backend domain). Session tokens live in `localStorage` and are attached as `Authorization: Bearer`.
 
 ### Checks
 
 ```bash
 npm run lint              # ESLint
+npm run test              # Vitest (auth + client)
 npm run build             # production bundle
 cd backend && pytest -q   # API contract and product invariants
 ```
@@ -109,9 +111,9 @@ A calm, spacious, premium SaaS surface in the spirit of Linear and Vercel: off-w
 
 The Morning Brief additionally uses a serif face for long-form passages and carries a print stylesheet so it can be presented or exported as-is.
 
-## Future Integrations
+## Integrations
 
-Google Calendar, Gmail, Notion and GoHighLevel share the same `IntegrationCard` and sync-history surface today, backed by PostgreSQL with `demo_data` fallback. The Morning Brief and Ask Briefly still use curated generation until OpenAI is wired; n8n is reserved for scheduled generation. Adding a live provider means implementing one module in `backend/app/integrations/` — no schema or UI changes.
+Google Calendar and Gmail sync into `Meeting` / `Email` when connected. Notion syncs into `NotionItem` (`NOTION_CLIENT_*`). GoHighLevel syncs opportunities into `Opportunity` (`GHL_CLIENT_*`). monday.com and ClickUp sync tasks into provider-neutral `WorkItem` rows (`MONDAY_CLIENT_*`, `CLICKUP_CLIENT_*`). OpenAI powers Morning Brief, Weekly Digest, meeting prep, email summaries, and Ask (`OPENAI_API_KEY`). Without those keys, the API keeps curated/`demo_data` behaviour. n8n schedules sync + brief regeneration via secret-authenticated webhooks (`N8N_WEBHOOK_SECRET`) — see [automation/n8n-daily-brief.md](automation/n8n-daily-brief.md).
 
 ## Documentation
 

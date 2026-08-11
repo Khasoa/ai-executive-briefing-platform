@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { CheckCircle2, CircleAlert, CircleDashed, Loader2, Plug } from "lucide-react"
+import { useAuth } from "@/auth/AuthContext"
 import { Card } from "@/components/ui/card"
 import { PageHeader, SectionHeading } from "@/components/common/PageHeader"
 import { RefreshButton } from "@/components/common/RefreshButton"
@@ -13,7 +14,8 @@ import {
 import { useToast } from "@/hooks/useToast"
 import { useApiQuery } from "@/hooks/useApiQuery"
 import { useAsyncAction } from "@/hooks/useAsyncAction"
-import { getIntegrations, syncIntegration } from "@/api/integrations"
+import { getIntegrations, syncIntegration, checkIntegration } from "@/api/integrations"
+import { resolveOAuthStartProvider } from "@/lib/oauthConnect"
 import { cn } from "@/lib/utils"
 
 const SYNC_STATUS = {
@@ -25,10 +27,26 @@ const SYNC_STATUS = {
 
 export function IntegrationsPage() {
   const toast = useToast()
+  const {
+    beginOAuth,
+    disconnectGoogle,
+    disconnectNotion,
+    disconnectGhl,
+    disconnectMonday,
+    disconnectClickup,
+    refreshGoogleStatus,
+    refreshNotionStatus,
+    refreshGhlStatus,
+    refreshMondayStatus,
+    refreshClickupStatus,
+  } = useAuth()
   const { data, loading, refreshing, error, refreshError, refetch, setData, clearRefreshError } =
     useApiQuery(getIntegrations)
   const [syncingId, setSyncingId] = useState(null)
+  const [connectingId, setConnectingId] = useState(null)
+  const [checkingId, setCheckingId] = useState(null)
   const sync = useAsyncAction(syncIntegration)
+  const check = useAsyncAction(checkIntegration)
 
   async function handleSync(integrationId) {
     setSyncingId(integrationId)
@@ -42,6 +60,94 @@ export function IntegrationsPage() {
       return
     }
     if (actionError) toast.error(actionError.message)
+    // Refresh list so Sync failed / statusDetail is visible after a provider error.
+    refetch()
+  }
+
+  async function handleCheck(integrationId) {
+    setCheckingId(integrationId)
+    const { data: result, error: actionError } = await check.run(integrationId)
+    setCheckingId(null)
+    if (result) {
+      refetch()
+      if (result.configured) toast.success(result.message)
+      else toast.error(result.message)
+      return
+    }
+    if (actionError) toast.error(actionError.message)
+  }
+
+  async function handleConnect(integrationId) {
+    const provider = resolveOAuthStartProvider(integrationId)
+    if (!provider) {
+      toast.error("This integration does not use OAuth Connect.")
+      return
+    }
+
+    setConnectingId(integrationId)
+    try {
+      // One provider only — never fan out to sibling OAuth starts.
+      await beginOAuth(provider)
+    } catch (err) {
+      setConnectingId(null)
+      const labels = {
+        notion: "Notion",
+        gohighlevel: "GoHighLevel",
+        monday: "monday.com",
+        clickup: "ClickUp",
+        google: "Google",
+      }
+      const label = labels[provider] || "OAuth"
+      toast.error(err?.message || `Could not start ${label} OAuth.`)
+    }
+  }
+
+  async function handleDisconnect(integrationId) {
+    try {
+      if (integrationId === "notion") {
+        await disconnectNotion()
+        await refreshNotionStatus()
+        refetch()
+        toast.success("Notion disconnected")
+        return
+      }
+      if (integrationId === "gohighlevel") {
+        await disconnectGhl()
+        await refreshGhlStatus()
+        refetch()
+        toast.success("GoHighLevel disconnected")
+        return
+      }
+      if (integrationId === "monday") {
+        await disconnectMonday()
+        await refreshMondayStatus()
+        refetch()
+        toast.success("monday.com disconnected")
+        return
+      }
+      if (integrationId === "clickup") {
+        await disconnectClickup()
+        await refreshClickupStatus()
+        refetch()
+        toast.success("ClickUp disconnected")
+        return
+      }
+      // Google family (google / gmail / google-calendar) shares one OAuth row.
+      if (
+        integrationId === "google" ||
+        integrationId === "gmail" ||
+        integrationId === "google-calendar"
+      ) {
+        await disconnectGoogle()
+        await refreshGoogleStatus()
+        refetch()
+        toast.success("Google disconnected")
+        return
+      }
+      toast.error("Disconnect is not available for this integration.")
+    } catch (err) {
+      toast.error(err?.message || "Could not disconnect integration.")
+    }
   }
 
   if (loading) return <ListSkeleton rows={3} maxWidth="max-w-5xl" />
@@ -54,7 +160,7 @@ export function IntegrationsPage() {
       <PageHeader
         eyebrow="Integrations"
         title="Where your brief comes from"
-        description={`${connectedCount} of ${totalCount} systems are connected. Briefly reads from each of them every morning and cites them in every recommendation.`}
+        description={`${connectedCount} of ${totalCount} systems are ready. Briefly reads from each of them every morning and cites them in every recommendation.`}
         actions={<RefreshButton onClick={refetch} refreshing={refreshing} />}
       />
 
@@ -74,7 +180,12 @@ export function IntegrationsPage() {
               integration={integration}
               index={index}
               onSync={handleSync}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onCheck={handleCheck}
               syncing={syncingId === integration.id}
+              connecting={connectingId === integration.id}
+              checking={checkingId === integration.id}
             />
           ))}
         </div>

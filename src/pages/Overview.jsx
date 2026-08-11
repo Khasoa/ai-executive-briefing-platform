@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { ArrowRight, Sun } from "lucide-react"
+import { ArrowRight, CalendarRange, Sun } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { PageHeader, SectionHeading } from "@/components/common/PageHeader"
 import { RefreshButton } from "@/components/common/RefreshButton"
@@ -36,6 +36,13 @@ export function OverviewPage() {
           <>
             <RefreshButton onClick={refetch} refreshing={refreshing} />
             <Link
+              to="/weekly-digest"
+              className={cn(buttonVariants({ variant: "ghost", size: "md" }), "gap-1.5")}
+            >
+              <CalendarRange className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+              Weekly Digest
+            </Link>
+            <Link
               to="/morning-brief"
               className={cn(buttonVariants({ variant: "primary", size: "md" }), "gap-1.5")}
             >
@@ -60,9 +67,9 @@ export function OverviewPage() {
           {focus.length === 0 ? (
             <EmptyState
               title="No focus items yet"
-              description="Once your Morning Brief is generated, Briefly ranks the recommendations that protect revenue or unblock the day."
-              actionLabel="Open Morning Brief"
-              actionTo="/morning-brief"
+              description="When Gmail, Calendar, Notion or work tools sync useful items, Briefly ranks them here — not only urgent risks."
+              actionLabel="Open Integrations"
+              actionTo="/integrations"
             />
           ) : (
             <div className="space-y-2.5">
@@ -93,7 +100,7 @@ export function OverviewPage() {
           {activity.length === 0 ? (
             <EmptyState
               title="No overnight activity"
-              description="When Gmail, Calendar and CRM are connected, changes appear here each morning."
+              description="When recent Gmail, Calendar, CRM or work-management changes sync, they appear here — including ordinary email volume."
               actionLabel="Check integrations"
               actionTo="/integrations"
               className="py-8"

@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db as _get_db
+from app.integrations.openai import OpenAIClient
 from app.models import User
+from app.services.ai_service import AIService
 from app.services.auth_service import AuthService
 from app.services.demo_user import get_or_create_demo_user
 
@@ -58,5 +60,20 @@ def get_current_user_required(
     return get_current_user(db=db, credentials=credentials)
 
 
+def get_openai_client() -> OpenAIClient:
+    """Provider client — thin Responses API transport (no business logic)."""
+    return OpenAIClient(get_settings())
+
+
+def get_ai_service(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    client: OpenAIClient = Depends(get_openai_client),
+) -> AIService:
+    """Orchestration layer for every AI capability. Routes should stay thin."""
+    return AIService(db, user, client=client)
+
+
 DbSession = Depends(get_db)
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AIServiceDep = Annotated[AIService, Depends(get_ai_service)]

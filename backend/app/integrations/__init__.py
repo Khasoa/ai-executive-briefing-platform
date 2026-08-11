@@ -1,8 +1,10 @@
 """External service integrations.
 
-Each submodule wraps one provider — Google Calendar, Gmail, OpenAI, GoHighLevel,
-Notion, n8n — behind a consistent interface the service layer calls. Scopes are
-read-only: Briefly summarises and drafts, it never sends or modifies.
-
-None are implemented yet; services read curated data. See docs/roadmap.md.
+OAuth identity providers live under `app.integrations.oauth`. Data sync:
+`google_calendar.py` and `gmail.py` read Google using tokens from OAuthService.
+Generation: `openai.py` (Responses API) is used only via `AIService`.
 """
+
+from app.integrations.oauth import get_oauth_provider, list_oauth_providers
+
+__all__ = ["get_oauth_provider", "list_oauth_providers"]

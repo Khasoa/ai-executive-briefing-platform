@@ -48,7 +48,7 @@ class KpiSchema(BaseModel):
 
 class ActivitySchema(BaseModel):
     id: str
-    type: Literal["email", "deal", "document", "meeting"]
+    type: Literal["email", "deal", "document", "meeting", "task"]
     title: str
     detail: str
     time: str

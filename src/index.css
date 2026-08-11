@@ -46,6 +46,38 @@
   --radius-2xl: 1.125rem;
 }
 
+/* Dark appearance — toggled via `html.dark` from theme preference. */
+html.dark {
+  --color-background: #141618;
+  --color-card: #1c1f24;
+  --color-muted: #22262c;
+  --color-subtle: #191c20;
+
+  --color-foreground: #f2f3f4;
+  --color-secondary-foreground: #c5cad1;
+  --color-muted-foreground: #9aa3ad;
+  --color-faint: #6d7682;
+
+  --color-border: #2c323a;
+  --color-border-strong: #3a424c;
+
+  --color-primary: #34d399;
+  --color-primary-hover: #6ee7b7;
+  --color-primary-foreground: #06281c;
+  --color-primary-soft: #0f2a22;
+  --color-primary-ring: #34d399;
+
+  --color-accent: #f59e0b;
+  --color-accent-strong: #fbbf24;
+  --color-accent-soft: #2a2114;
+
+  --color-critical: #f87171;
+  --color-critical-soft: #2a1616;
+  --color-positive: #34d399;
+  --color-neutral: #9aa3ad;
+  --color-neutral-soft: #22262c;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -126,8 +158,15 @@
     text-wrap: balance;
   }
 
+  /* Theme-aware skeleton pulse — must use CSS variables so dark mode
+     does not paint hard-coded near-white blocks over muted surfaces. */
   .shimmer {
-    background: linear-gradient(90deg, #f1f1ef 0%, #f7f7f5 50%, #f1f1ef 100%);
+    background: linear-gradient(
+      90deg,
+      var(--color-muted) 0%,
+      color-mix(in srgb, var(--color-muted) 55%, var(--color-border)) 45%,
+      var(--color-muted) 100%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.6s ease-in-out infinite;
   }
@@ -177,12 +216,17 @@
   }
 }
 
+/* Scope reduced-motion to our CSS animations only.
+   A global `* { transition-duration: 0.01ms !important }` breaks Framer Motion
+   and can leave content stuck near opacity 0 after route transitions. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .shimmer {
+    animation: none !important;
+    background: var(--color-muted);
+  }
+
+  .pulse-soft {
+    animation: none !important;
+    opacity: 1;
   }
 }

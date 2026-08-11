@@ -6,6 +6,8 @@ const SOURCE_ICONS = {
   "Google Calendar": Calendar,
   GoHighLevel: Database,
   Notion: FileText,
+  "monday.com": Workflow,
+  ClickUp: Workflow,
   OpenAI: Sparkles,
   n8n: Workflow,
 }

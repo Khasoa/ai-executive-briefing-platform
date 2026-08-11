@@ -12,7 +12,11 @@ from app.db.base import Base
 
 class Email(Base):
     __tablename__ = "emails"
-    __table_args__ = (Index("ix_emails_user_category", "user_id", "category"),)
+    __table_args__ = (
+        Index("ix_emails_user_category", "user_id", "category"),
+        # Partial unique index created in migration 007:
+        # uq_emails_user_external ON (user_id, external_id) WHERE external_id IS NOT NULL
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

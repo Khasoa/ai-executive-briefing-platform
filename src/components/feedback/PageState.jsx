@@ -154,12 +154,12 @@ export function ListSkeleton({ rows = 5, maxWidth = "max-w-5xl" }) {
   )
 }
 
-export function DocumentSkeleton() {
+export function DocumentSkeleton({ label = "Loading morning brief" } = {}) {
   return (
     <div
       className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-10"
       aria-busy="true"
-      aria-label="Loading morning brief"
+      aria-label={label}
     >
       <HeaderSkeleton />
       <Skeleton className="mb-6 h-40 w-full sm:h-48" />

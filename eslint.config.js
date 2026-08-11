@@ -8,6 +8,15 @@ import { defineConfig, globalIgnores } from "eslint/config"
 export default defineConfig([
   globalIgnores(["dist", "backend", "node_modules"]),
   {
+    files: ["**/*.{test,spec}.{js,jsx}"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.vitest,
+      },
+    },
+  },
+  {
     files: ["**/*.{js,jsx}"],
     extends: [
       js.configs.recommended,
@@ -33,7 +42,7 @@ export default defineConfig([
       // Allow constant re-exports from UI primitive modules (e.g. buttonVariants).
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true },
+        { allowConstantExport: true, allowExportNames: ["useAuth"] },
       ],
       // Component names and similar PascalCase bindings often look unused to the core rule.
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
