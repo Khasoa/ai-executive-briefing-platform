@@ -95,7 +95,7 @@ class IntegrationService:
                 status="configured" if configured else "not-connected",
                 message=(
                     "n8n webhook secret is configured. Call POST /webhooks/n8n/run|daily|weekly "
-                    "with header X-Briefly-N8N-Secret."
+                    "or /webhooks/n8n/email-follow-up with X-Briefly-N8N-Secret."
                     if configured
                     else "n8n webhook secret is not configured."
                 ),

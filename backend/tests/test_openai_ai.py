@@ -492,7 +492,8 @@ def test_morning_brief_failover_to_curated(monkeypatch):
 
 def test_meeting_prep_generation_and_manual_preservation(monkeypatch):
     user = _demo_user()
-    now = datetime.now(timezone.utc)
+    # Midday UTC keeps the event on "today" for Europe/Athens demo timezone.
+    now = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
     meeting = Meeting(
         id=uuid4(),
         user_id=user.id,

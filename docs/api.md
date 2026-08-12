@@ -207,6 +207,44 @@ Syncs all providers + regenerates Morning Brief.
 
 Syncs all providers + regenerates Weekly Digest.
 
+### `POST /webhooks/n8n/email-follow-up`
+
+Triage **one** email for executive action using Briefly's existing `AIService`.
+
+- Analysis only — never sends mail, never creates tasks, never mutates inbox.
+- Authenticate with `X-Briefly-N8N-Secret` (same as other n8n webhooks).
+- Malformed / unavailable AI → `502` with a generic message (no provider details).
+
+**Request**
+
+```json
+{
+  "message_id": "gmail-msg-123",
+  "thread_id": "gmail-thread-456",
+  "sender": "partner@client.com",
+  "subject": "Can we meet Thursday?",
+  "received_at": "2026-08-11T08:00:00Z",
+  "body": "Would you be free Thursday 10:00 for a 30-minute sync?"
+}
+```
+
+**Response**
+
+```json
+{
+  "requires_action": true,
+  "priority": "medium",
+  "category": "meeting_request",
+  "action": "Confirm or decline the proposed meeting time",
+  "deadline": null,
+  "reason": "Sender requests a meeting and asks for availability.",
+  "suggested_response": "Happy to meet — Thursday 10:00 works on my side.",
+  "confidence": 0.84
+}
+```
+
+Promotional / newsletter / generic marketing mail should normally return `requires_action: false`. Approvals, information requests, meeting requests, and explicit deadlines should normally return `requires_action: true`. Deadlines are only returned when explicitly stated in the email.
+
 ---
 
 ## Workspace

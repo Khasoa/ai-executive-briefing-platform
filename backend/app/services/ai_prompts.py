@@ -68,6 +68,30 @@ def email_summary_user_prompt(context: dict[str, Any]) -> str:
     )
 
 
+def email_follow_up_user_prompt(email: dict[str, Any]) -> str:
+    return (
+        "Triage this single email for an executive. Return JSON only.\n"
+        "Decide whether the email requires executive action.\n"
+        "Rules:\n"
+        "- Promotional, marketing, newsletter, discount, advertising, social, "
+        "and generic automated mail normally require_action=false unless a clear "
+        "transactional or time-sensitive action is stated.\n"
+        "- Approvals, information requests, meeting requests, decisions, "
+        "investor/client/vendor responses, explicit deadlines, and important "
+        "operational issues normally require_action=true.\n"
+        "- Do not infer urgency from unread status (unread is not provided).\n"
+        "- Do not invent deadlines, relationships, or business context.\n"
+        "- If a deadline is not explicitly stated, deadline must be null.\n"
+        "- If insufficient information, say so in reason and lower confidence.\n"
+        "- Never claim to have sent a reply; suggested_response is a draft only.\n"
+        "- priority must be low|medium|high.\n"
+        "- category should be a short label such as promotional, newsletter, "
+        "meeting_request, approval_request, information_request, decision_needed, "
+        "client_stakeholder, operational, automated, or other.\n"
+        f"EMAIL:\n{_json(email)}"
+    )
+
+
 def ask_user_prompt(question: str, context: dict[str, Any]) -> str:
     return (
         "Answer the executive question as a cited report card.\n"
@@ -399,6 +423,32 @@ EMAIL_SUMMARY_SCHEMA: dict[str, Any] = {
         "importance": {"type": "string", "enum": SEVERITY_ENUM},
         "actionItems": {"type": "array", "items": {"type": "string"}},
         "followUpSuggestion": {"type": "string"},
+    },
+}
+
+
+EMAIL_FOLLOW_UP_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "requires_action",
+        "priority",
+        "category",
+        "action",
+        "deadline",
+        "reason",
+        "suggested_response",
+        "confidence",
+    ],
+    "properties": {
+        "requires_action": {"type": "boolean"},
+        "priority": {"type": "string", "enum": ["low", "medium", "high"]},
+        "category": {"type": "string"},
+        "action": {"type": ["string", "null"]},
+        "deadline": {"type": ["string", "null"]},
+        "reason": {"type": "string"},
+        "suggested_response": {"type": ["string", "null"]},
+        "confidence": {"type": "number"},
     },
 }
 

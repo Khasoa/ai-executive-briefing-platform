@@ -50,6 +50,7 @@ app/
 | POST | `/webhooks/n8n/run` | n8n orchestration (secret header) |
 | POST | `/webhooks/n8n/daily` | Sync providers + Morning Brief |
 | POST | `/webhooks/n8n/weekly` | Sync providers + Weekly Digest |
+| POST | `/webhooks/n8n/email-follow-up` | Triage one email for executive action (AI; never sends mail) |
 | GET | `/workspace` | Shell payload: identity, brief freshness, nav counts |
 | GET | `/overview` | Executive dashboard (summary/priorities/risks partially DB-backed — see below) |
 | GET | `/daily-brief/latest` | Latest `DailyBrief` row, read directly from PostgreSQL |
@@ -95,6 +96,7 @@ There is deliberately no send, move or accept endpoint. See ADR-002.
 | `AskService` | Cited reports via `AIService` + curated failover; persists `ask_reports` |
 | `IntegrationService` | Canonical catalog ∪ user `integrations` + `sync_events` |
 | `OrchestrationService` | n8n-driven multi-provider sync + brief/digest regenerate |
+| `EmailFollowUpIntelligenceService` | n8n email triage via existing `AIService` (never sends mail) |
 | `SettingsService` | Profile from `User`; demo preferences curated; non-demo preferences on `User.preferences` |
 
 Shared infrastructure: `db_fallback.py` (empty-table + `SQLAlchemyError` fallback with session rollback), `mapping_utils.py` (id/JSONB/relative-time helpers), `demo_user.py` (demo tenant + `AUTH_REQUIRED=false` fallback). Domain services take `(db, user)` and own their tables; cross-domain reads always go through the owning service, never through another service's mock collection.

@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.config import Settings, get_settings
+from app.schemas.email_follow_up import EmailFollowUpRequest, EmailFollowUpResponse
+from app.services.email_follow_up_intelligence_service import EmailFollowUpIntelligenceService
 from app.services.orchestration_service import ALL_PROVIDERS, OrchestrationService
 
 router = APIRouter(prefix="/webhooks/n8n", tags=["n8n"])
@@ -97,3 +99,24 @@ def n8n_weekly(
         regenerate_morning_brief=False,
         regenerate_weekly_digest=True,
     )
+
+
+@router.post(
+    "/email-follow-up",
+    response_model=EmailFollowUpResponse,
+    summary="Triage one email for executive action (n8n)",
+    response_description="Structured follow-up intelligence — never sends email",
+)
+def n8n_email_follow_up(
+    payload: EmailFollowUpRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_n8n_secret),
+) -> EmailFollowUpResponse:
+    """Analyze a single email and return whether the executive should act.
+
+    Uses Briefly's existing AIService. Does not send replies, create tasks,
+    or mutate inbox state. Authenticate with ``X-Briefly-N8N-Secret``.
+    """
+    orch = OrchestrationService(db)
+    user = orch.resolve_user()
+    return EmailFollowUpIntelligenceService(db, user).analyze(payload)

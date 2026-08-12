@@ -84,6 +84,18 @@ class AIService:
             return None
         return self._normalise_email_summary(raw)
 
+    def generate_email_follow_up(self, email_context: dict[str, Any]) -> dict[str, Any] | None:
+        """n8n email triage — structured action/priority JSON, or None on failure."""
+        raw = self._generate_json(
+            system=ai_prompts.SYSTEM_EXECUTIVE,
+            user=ai_prompts.email_follow_up_user_prompt(email_context),
+            schema_name="email_follow_up",
+            schema=ai_prompts.EMAIL_FOLLOW_UP_SCHEMA,
+        )
+        if raw is None:
+            return None
+        return self._normalise_email_follow_up(raw)
+
     def answer_question(self, question: str) -> dict[str, Any] | None:
         """Ask report body (without id / answeredAt), or None → curated."""
         context = self._ask_context()
@@ -530,6 +542,49 @@ class AIService:
             "importance": str(raw.get("importance") or "medium"),
             "followUpSuggestion": str(raw.get("followUpSuggestion") or ""),
             "actionItems": actions,
+        }
+
+    @staticmethod
+    def _normalise_email_follow_up(raw: dict[str, Any]) -> dict[str, Any] | None:
+        required = (
+            "requires_action",
+            "priority",
+            "category",
+            "reason",
+            "confidence",
+        )
+        if not isinstance(raw, dict) or any(key not in raw for key in required):
+            logger.warning("Email follow-up JSON missing required keys")
+            return None
+
+        priority = str(raw.get("priority") or "medium").strip().lower()
+        if priority not in ("low", "medium", "high"):
+            logger.warning("Email follow-up JSON has invalid priority")
+            return None
+
+        try:
+            confidence = float(raw.get("confidence"))
+        except (TypeError, ValueError):
+            logger.warning("Email follow-up JSON has invalid confidence")
+            return None
+        confidence = max(0.0, min(1.0, confidence))
+
+        def _nullable_str(value: Any) -> str | None:
+            if value is None:
+                return None
+            text = str(value).strip()
+            return text or None
+
+        return {
+            "requires_action": bool(raw.get("requires_action")),
+            "priority": priority,  # type: ignore[dict-item]
+            "category": str(raw.get("category") or "other").strip() or "other",
+            "action": _nullable_str(raw.get("action")),
+            "deadline": _nullable_str(raw.get("deadline")),
+            "reason": str(raw.get("reason") or "").strip()
+            or "Insufficient information to triage confidently.",
+            "suggested_response": _nullable_str(raw.get("suggested_response")),
+            "confidence": confidence,
         }
 
     @staticmethod
