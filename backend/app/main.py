@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     ask,
+    auth,
     crm,
     daily_brief,
     health,
@@ -12,7 +13,11 @@ from app.api.routes import (
     integrations,
     meetings,
     morning_brief,
+    n8n,
     overview,
+    oauth,
+    webhooks,
+    weekly_digest,
     workspace,
 )
 from app.api.routes import settings as settings_routes
@@ -48,10 +53,15 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(health.router)
+    app.include_router(auth.router)
+    app.include_router(oauth.router)
+    app.include_router(webhooks.router)
+    app.include_router(n8n.router)
     app.include_router(workspace.router)
     app.include_router(overview.router)
     app.include_router(daily_brief.router)
     app.include_router(morning_brief.router)
+    app.include_router(weekly_digest.router)
     app.include_router(inbox.router)
     app.include_router(meetings.router)
     app.include_router(crm.router)

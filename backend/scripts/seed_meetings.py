@@ -11,7 +11,7 @@ directly through the `Meeting` ORM model rather than through a service
 method, because `MeetingService` is intentionally read-only: it only ever
 *retrieves* meetings for the API (see `MeetingService.list_meetings()`), so
 there is no write path to route through. Meetings need a `user_id`, so this
-script also finds or creates a demo user matching `mock_data.USER`.
+script also finds or creates a demo user matching `demo_data.USER`.
 """
 
 import sys
@@ -29,7 +29,7 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.models import Meeting  # noqa: E402
 from seed_common import get_or_create_demo_user, seed_idempotently  # noqa: E402
 
-# Matches mock_data.USER / mock_data.BRIEF_DATE so seeded meetings sit
+# Matches demo_data.USER / demo_data.BRIEF_DATE so seeded meetings sit
 # consistently alongside the rest of the mocked morning brief.
 ATHENS = timezone(timedelta(hours=3))
 MEETING_DATE = (2026, 8, 4)
@@ -133,7 +133,7 @@ MEETINGS = [
                 {
                     "id": "rel_investor_1",
                     "subject": "Monthly update — July",
-                    "sender": "Lydia Reyes",
+                    "sender": "Lydia K.",
                     "summary": "Sent Monday. Covers ARR, NRR, burn multiple and the Meridian renewal risk.",
                     "time": "2 days ago",
                 }

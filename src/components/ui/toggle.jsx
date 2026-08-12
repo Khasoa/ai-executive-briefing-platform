@@ -26,16 +26,37 @@ export function Toggle({ checked, onChange, label, disabled = false, className }
 }
 
 /** Segmented control for small, mutually exclusive option sets. */
-export function SegmentedControl({ options, value, onChange, className }) {
+export function SegmentedControl({
+  options,
+  value,
+  onChange,
+  className,
+  disabled = false,
+  "aria-label": ariaLabel,
+}) {
   return (
-    <div className={cn("inline-flex rounded-lg border border-border bg-muted p-0.5", className)}>
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-disabled={disabled || undefined}
+      className={cn(
+        "inline-flex max-w-full flex-wrap rounded-lg border border-border bg-muted p-0.5",
+        disabled && "opacity-50",
+        className,
+      )}
+    >
       {options.map((option) => (
         <button
           key={option}
           type="button"
+          role="radio"
+          aria-checked={value === option}
+          disabled={disabled}
           onClick={() => onChange(option)}
           className={cn(
-            "cursor-pointer rounded-md px-3 py-1 text-[13px] font-medium transition-colors duration-150",
+            "cursor-pointer rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 sm:px-3 sm:text-[13px]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40",
+            "disabled:cursor-not-allowed",
             value === option
               ? "bg-card text-foreground surface"
               : "text-muted-foreground hover:text-foreground",

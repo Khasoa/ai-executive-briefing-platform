@@ -1,4 +1,9 @@
-"""In-memory dataset backing the Briefly API.
+"""Demo / fallback dataset for the Briefly API.
+
+Used only as: (1) empty-table and SQLAlchemyError fallback for
+persistence-backed services, (2) Morning Brief generator content until
+OpenAI is wired, and (3) still-curated surfaces (Ask reports, Settings,
+Overview KPIs/activity/focus).
 
 Every value here mirrors the shape a real integration (Gmail, Google Calendar,
 GoHighLevel, Notion) would return once wired up, so services can swap the source
@@ -9,11 +14,11 @@ BRIEF_DATE = "Tuesday, August 4, 2026"
 
 USER = {
     "name": "Lydia",
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
-    "avatar": "LR",
+    "avatar": "LK",
     "timezone": "Europe/Athens",
 }
 
@@ -559,6 +564,21 @@ INBOX_CATEGORIES = [
         "id": "informational",
         "label": "Information Only",
         "description": "No action required, read when convenient",
+    },
+    {
+        "id": "promotional",
+        "label": "Promotional",
+        "description": "Marketing, discounts, and campaigns",
+    },
+    {
+        "id": "newsletter",
+        "label": "Newsletters",
+        "description": "Subscriptions and digests",
+    },
+    {
+        "id": "automated",
+        "label": "Automated",
+        "description": "System notifications and receipts",
     },
 ]
 
@@ -1534,6 +1554,38 @@ INTEGRATIONS = [
         "poweredBy": "GoHighLevel API v2",
     },
     {
+        "id": "monday",
+        "name": "monday.com",
+        "category": "Work management",
+        "description": "Boards, tasks and deadlines that show what needs executive attention.",
+        "status": "not-connected",
+        "account": None,
+        "lastSync": None,
+        "lastSyncLabel": "Never",
+        "scopes": ["me:read", "boards:read", "workspaces:read"],
+        "metrics": [
+            {"label": "Items synced", "value": "—"},
+            {"label": "Boards", "value": "—"},
+        ],
+        "poweredBy": "monday.com API",
+    },
+    {
+        "id": "clickup",
+        "name": "ClickUp",
+        "category": "Work management",
+        "description": "Tasks, priorities and owners across authorized ClickUp workspaces.",
+        "status": "not-connected",
+        "account": None,
+        "lastSync": None,
+        "lastSyncLabel": "Never",
+        "scopes": ["workspace.read", "tasks.read"],
+        "metrics": [
+            {"label": "Tasks synced", "value": "—"},
+            {"label": "Workspaces", "value": "—"},
+        ],
+        "poweredBy": "ClickUp API",
+    },
+    {
         "id": "openai",
         "name": "OpenAI",
         "category": "Intelligence",
@@ -1625,13 +1677,13 @@ SYNC_HISTORY = [
 ]
 
 SETTINGS_PROFILE = {
-    "fullName": "Lydia Reyes",
+    "fullName": "Lydia K.",
     "role": "Founder & CEO",
     "company": "Arcadia Systems",
     "email": "lydia@arcadiasystems.com",
     "phone": "+30 210 555 0148",
     "timezone": "Europe/Athens (GMT+3)",
-    "avatar": "LR",
+    "avatar": "LK",
 }
 
 SETTINGS_PREFERENCES = {
@@ -1715,3 +1767,105 @@ CONNECTED_ACCOUNTS = [
     {"id": "acc_3", "provider": "GoHighLevel", "detail": "Location 4821", "status": "connected", "connectedAt": "March 3, 2026"},
     {"id": "acc_4", "provider": "n8n", "detail": "Not connected", "status": "not-connected", "connectedAt": None},
 ]
+
+# Curated Weekly Email Digest — used when AI is unavailable / too few emails for demo.
+WEEKLY_DIGEST = {
+    "headline": "Meridian, hiring, and Pinnacle shaped the week — carry three threads forward.",
+    "summary": (
+        "The inbox clustered around three themes: the Meridian renewal under competitive pressure, "
+        "an internal Q3 hiring decision waiting on you, and Pinnacle's security review. "
+        "Several threads were correctly delegated; a handful still need your judgement next week."
+    ),
+    "importantConversations": [
+        {
+            "id": "wd_imp_1",
+            "title": "Meridian Labs renewal under competitive pressure",
+            "detail": (
+                "James Liu forwarded a Vantage Cloud proposal; silence has stretched nine days "
+                "with a Friday close. Champion dynamics and pricing defence dominate."
+            ),
+            "source": "Gmail",
+            "emailIds": ["em_1"],
+        },
+        {
+            "id": "wd_imp_2",
+            "title": "Pinnacle Health security questionnaire",
+            "detail": "Item 4.7 on encryption-at-rest needs a clear answer before Security Review advances.",
+            "source": "Gmail",
+            "emailIds": ["em_3"],
+        },
+    ],
+    "decisionsAndApprovals": [
+        {
+            "id": "wd_dec_1",
+            "title": "Q3 hiring plan sign-off",
+            "detail": "Sarah Chen needs your approval on three senior roles before Friday.",
+            "source": "Gmail",
+            "emailIds": ["em_2"],
+        },
+    ],
+    "followUps": [
+        {
+            "id": "wd_fu_1",
+            "title": "Cascade Analytics proposal reply",
+            "detail": "Inbound interest still open; Elena can draft, but a short personal note would help.",
+            "source": "Gmail",
+            "emailIds": ["em_6"],
+        },
+    ],
+    "unresolvedItems": [
+        {
+            "id": "wd_un_1",
+            "title": "September advisory board venue holds",
+            "detail": "Venue holds expire Friday — ops is waiting on a go/no-go.",
+            "source": "Gmail",
+            "emailIds": ["em_4"],
+        },
+    ],
+    "notableActivity": [
+        {
+            "id": "wd_na_1",
+            "title": "July metrics published",
+            "detail": "ARR $3.4M · NRR 118% · useful context for board and renewals.",
+            "source": "Gmail",
+            "emailIds": ["em_5"],
+        },
+        {
+            "id": "wd_na_2",
+            "title": "Globex support escalation resolved",
+            "detail": "Latency traced to index rebuild; permanent fix owned by Marcus.",
+            "source": "Gmail",
+            "emailIds": ["em_9"],
+        },
+    ],
+    "carryIntoNextWeek": [
+        {
+            "id": "wd_nx_1",
+            "title": "Close or walk Meridian before Friday",
+            "detail": "Defended number and walk-away line still the highest-leverage carry item.",
+            "source": "Gmail",
+            "emailIds": ["em_1"],
+        },
+        {
+            "id": "wd_nx_2",
+            "title": "Approve or send back the hiring plan",
+            "detail": "Roles sit blocked without an executive decision.",
+            "source": "Gmail",
+            "emailIds": ["em_2"],
+        },
+        {
+            "id": "wd_nx_3",
+            "title": "Answer Pinnacle 4.7",
+            "detail": "Security Review stalls without encryption clarification.",
+            "source": "Gmail",
+            "emailIds": ["em_3"],
+        },
+    ],
+    "planningNote": (
+        "Block Monday morning for Meridian and hiring decisions before new meetings fill the week. "
+        "Keep Pinnacle security as a short focused slot — do not let it drift into midweek."
+    ),
+    "confidence": "medium",
+    "sources": ["Gmail"],
+    "emailCount": 11,
+}

@@ -24,13 +24,13 @@ ai-executive-partner/
 │   │   ├── feedback/     # Loading, empty and error states
 │   │   ├── layout/       # App shell and sidebar
 │   │   └── ui/           # shadcn-style primitives
-│   ├── hooks/            # useApiQuery, useAsyncAction
+│   ├── hooks/            # useApiQuery, useAsyncAction, useToast
 │   ├── lib/              # cn, formatting, motion presets, signal vocabulary
 │   ├── pages/            # One file per route
-│   └── services/         # API client — every request the app makes
+│   └── api/              # HTTP client + one module per backend domain
 ├── backend/              # FastAPI backend
 ├── docs/                 # Architecture, API and decision records
-├── automation/           # n8n workflow definitions (future)
+├── automation/           # n8n orchestration docs / workflow notes
 └── assets/               # Screenshots and demo assets
 ```
 
@@ -46,6 +46,7 @@ ai-executive-partner/
 |-------|---------|
 | `/` | Executive dashboard: summary, KPIs, activity, today's focus |
 | `/morning-brief` | The full briefing, formatted as a printable executive report |
+| `/weekly-digest` | Weekly email memory + next-week planning |
 | `/inbox` | Intelligent email summaries, not a raw message list |
 | `/meetings` | Meeting intelligence: context, talking points, questions, risks |
 | `/crm` | Only the opportunities that need executive attention |
@@ -73,11 +74,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Configure DATABASE_URL, then:
 alembic upgrade head
-# Optional demo data (idempotent): see backend/README.md
+python3 scripts/seed.py   # optional, idempotent demo data
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md).
+API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md). Backend onboarding: [backend/README.md](backend/README.md).
 
 ### Frontend
 
@@ -87,29 +88,32 @@ cp .env.example .env    # VITE_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:5173](http://localhost:5173). Unauthenticated visitors land on `/login`. For Google, Notion, or GoHighLevel OAuth in the browser, set backend `OAUTH_SUCCESS_REDIRECT=http://localhost:5173/oauth/callback`.
 
-No page holds its own copy of server data — every view is rendered from an API response through `src/services/briefly.js`.
+No page holds its own copy of server data — every view is rendered from an API response through `src/api/` (one module per backend domain). Session tokens live in `localStorage` and are attached as `Authorization: Bearer`.
 
 ### Checks
 
 ```bash
-npm run lint              # oxlint
+npm run lint              # ESLint
+npm run test              # Vitest (auth + client)
 npm run build             # production bundle
 cd backend && pytest -q   # API contract and product invariants
 ```
+
+Frontend lint uses **ESLint** (`eslint.config.js`) with `eslint-plugin-react`, React Hooks, and React Refresh for the Vite + JavaScript app.
 
 The backend suite covers every endpoint, both mutation paths, and the invariants that define the product: no endpoint acts on the executive's behalf, and automatic actions cannot be enabled.
 
 ## Design Direction
 
-A calm, spacious, premium SaaS surface in the spirit of Linear and Vercel: off-white page, white cards, deep emerald primary, warm amber accent, slate text. Subtle shadows, restrained glass, short transitions. No AI-blue gradients, no glow, no motion for its own sake.
+A calm, spacious, premium SaaS surface in the spirit of Linear and Vercel: off-white page, white cards, deep emerald primary, warm amber accent, slate text. Subtle shadows, short transitions. No AI-blue gradients, no glow, no motion for its own sake.
 
 The Morning Brief additionally uses a serif face for long-form passages and carries a print stylesheet so it can be presented or exported as-is.
 
-## Future Integrations
+## Integrations
 
-Google Calendar, Gmail, Notion and GoHighLevel are wired through the same `IntegrationCard` and sync-history surface today, backed by curated data. OpenAI generates the brief, and n8n is reserved for scheduled generation. Adding a live provider means implementing one module in `backend/app/integrations/` — no schema or UI changes.
+Google Calendar and Gmail sync into `Meeting` / `Email` when connected. Notion syncs into `NotionItem` (`NOTION_CLIENT_*`). GoHighLevel syncs opportunities into `Opportunity` (`GHL_CLIENT_*`). monday.com and ClickUp sync tasks into provider-neutral `WorkItem` rows (`MONDAY_CLIENT_*`, `CLICKUP_CLIENT_*`). OpenAI powers Morning Brief, Weekly Digest, meeting prep, email summaries, and Ask (`OPENAI_API_KEY`). Without those keys, the API keeps curated/`demo_data` behaviour. n8n schedules sync + brief regeneration via secret-authenticated webhooks (`N8N_WEBHOOK_SECRET`) — see [automation/n8n-daily-brief.md](automation/n8n-daily-brief.md).
 
 ## Documentation
 

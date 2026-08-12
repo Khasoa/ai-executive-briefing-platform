@@ -14,7 +14,7 @@ function RankedSection({ items }) {
       {items.map((item, index) => (
         <li
           key={item.title}
-          className="flex items-start gap-3 rounded-lg border border-border bg-subtle px-3.5 py-3"
+          className="flex items-start gap-3 rounded-lg bg-subtle px-3 py-2.5"
         >
           <span className="mt-px w-4 shrink-0 text-[13px] font-semibold text-faint numeric">
             {index + 1}

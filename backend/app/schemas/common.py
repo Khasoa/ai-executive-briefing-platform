@@ -9,7 +9,16 @@ Severity = Literal["critical", "high", "medium", "low"]
 Confidence = Literal["high", "medium", "low"]
 
 # Systems the AI can cite as the origin of a statement.
-Source = Literal["Gmail", "Google Calendar", "GoHighLevel", "Notion", "OpenAI", "n8n"]
+Source = Literal[
+    "Gmail",
+    "Google Calendar",
+    "GoHighLevel",
+    "Notion",
+    "monday.com",
+    "ClickUp",
+    "OpenAI",
+    "n8n",
+]
 
 
 class BriefMetaSchema(BaseModel):

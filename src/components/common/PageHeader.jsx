@@ -7,20 +7,24 @@ import { fadeUp } from "@/lib/motion"
  */
 export function PageHeader({ eyebrow, title, description, actions, className }) {
   return (
-    <motion.header {...fadeUp} className={cn("mb-8", className)}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <motion.header {...fadeUp} className={cn("mb-5 sm:mb-7", className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          {eyebrow && <p className="eyebrow mb-2 text-muted-foreground">{eyebrow}</p>}
-          <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight text-foreground">
+          {eyebrow && <p className="eyebrow mb-1.5 text-faint">{eyebrow}</p>}
+          <h1 className="text-[1.5rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[1.75rem]">
             {title}
           </h1>
           {description && (
-            <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground text-balance">
+            <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-muted-foreground text-balance sm:text-[14px]">
               {description}
             </p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2 no-print">{actions}</div>}
+        {actions && (
+          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 no-print sm:w-auto sm:justify-end">
+            {actions}
+          </div>
+        )}
       </div>
     </motion.header>
   )
@@ -28,10 +32,19 @@ export function PageHeader({ eyebrow, title, description, actions, className }) 
 
 export function SectionHeading({ title, description, action, className }) {
   return (
-    <div className={cn("mb-4 flex items-end justify-between gap-4", className)}>
-      <div>
-        <h2 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h2>
-        {description && <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>}
+    <div
+      className={cn(
+        "mb-3 flex flex-col gap-1.5 sm:mb-3.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h2 className="text-[14px] font-semibold tracking-tight text-foreground sm:text-[15px]">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
+        )}
       </div>
       {action}
     </div>

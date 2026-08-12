@@ -2,7 +2,7 @@
 
 `priorities` and `risks` reuse `PrioritySchema` / `RiskSchema` from
 `app/schemas/common.py` on purpose: those are the exact shapes `OverviewService`
-already returns from `mock_data`, so a database-backed brief and a curated one
+already returns from `demo_data`, so a database-backed brief and a curated one
 are indistinguishable to the frontend.
 """
 

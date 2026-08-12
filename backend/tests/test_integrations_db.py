@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import Integration, SyncEvent
-from app.services import mock_data
+from app.services import demo_data
 
 client = TestClient(app)
 
@@ -42,7 +42,7 @@ def _fake_sync_event_row(integration: Integration, **overrides) -> SyncEvent:
         integration_id=integration.id,
         event="Database-backed sync completed",
         status="success",
-        detail="Came from PostgreSQL, not mock_data.",
+        detail="Came from PostgreSQL, not demo_data.",
         occurred_at=datetime.now(timezone.utc) - timedelta(minutes=3),
     )
     defaults.update(overrides)
@@ -69,6 +69,9 @@ class _FakeQuery:
     def filter(self, *args, **kwargs):
         return self
 
+    def join(self, *args, **kwargs):
+        return self
+
     def all(self):
         return list(self._rows)
 
@@ -79,9 +82,15 @@ class _FakeQuery:
 def _patch_session(monkeypatch, *, integrations=None, sync_events=None, raise_error=False):
     """Patches `Session` so IntegrationService runs its real query/write logic."""
 
+    from app.models import User
+    from app.services.demo_user import DEMO_USER, DEMO_USER_FALLBACK_ID
+
     tables = {
         Integration: list(integrations or []),
         SyncEvent: list(sync_events or []),
+        User: [
+            User(id=DEMO_USER_FALLBACK_ID, **DEMO_USER, hashed_password="!"),
+        ],
     }
 
     def _fake_query(self, model, *args, **kwargs):
@@ -127,9 +136,12 @@ def test_integrations_are_returned_from_postgres_when_rows_exist(monkeypatch):
     data = response.json()
 
     ids = {i["id"] for i in data["integrations"]}
-    assert ids == {"database-provider", "second-database-provider"}
-    assert data["totalCount"] == 2
-    assert data["connectedCount"] == 1
+    # Canonical catalog is always present; extra user-owned rows are appended.
+    assert "google-calendar" in ids
+    assert "gmail" in ids
+    assert "notion" in ids
+    assert {"database-provider", "second-database-provider"}.issubset(ids)
+    assert data["totalCount"] >= len(ids)
 
     first = next(i for i in data["integrations"] if i["id"] == "database-provider")
     assert first["name"] == "Database Provider"
@@ -139,16 +151,18 @@ def test_integrations_are_returned_from_postgres_when_rows_exist(monkeypatch):
     assert first["lastSyncLabel"].endswith("ago")
 
 
-def test_integrations_fall_back_to_mock_data_when_table_is_empty(monkeypatch):
+def test_integrations_fall_back_to_demo_data_when_table_is_empty(monkeypatch):
     _patch_session(monkeypatch, integrations=[], sync_events=[])
 
     response = client.get("/integrations")
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in mock_data.INTEGRATIONS}
-    assert data["totalCount"] == len(mock_data.INTEGRATIONS)
-    assert data["syncHistory"] == mock_data.SYNC_HISTORY
+    assert {i["id"] for i in demo_data.INTEGRATIONS}.issubset(
+        {i["id"] for i in data["integrations"]}
+    )
+    assert data["totalCount"] >= len(demo_data.INTEGRATIONS)
+    assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 
 def test_integrations_fall_back_when_the_database_is_unreachable(monkeypatch):
@@ -158,8 +172,11 @@ def test_integrations_fall_back_when_the_database_is_unreachable(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert {i["id"] for i in data["integrations"]} == {i["id"] for i in mock_data.INTEGRATIONS}
-    assert data["syncHistory"] == mock_data.SYNC_HISTORY
+    # Demo user still gets the curated catalog overlay; sync history falls back.
+    assert {i["id"] for i in demo_data.INTEGRATIONS}.issubset(
+        {i["id"] for i in data["integrations"]}
+    )
+    assert data["syncHistory"] == demo_data.SYNC_HISTORY
 
 
 def test_sync_history_is_returned_from_postgres_when_rows_exist(monkeypatch):
@@ -174,7 +191,7 @@ def test_sync_history_is_returned_from_postgres_when_rows_exist(monkeypatch):
     assert len(data["syncHistory"]) == 1
     assert data["syncHistory"][0]["id"] == str(event.id)
     assert data["syncHistory"][0]["integrationId"] == "gmail"
-    assert data["syncHistory"][0]["detail"] == "Came from PostgreSQL, not mock_data."
+    assert data["syncHistory"][0]["detail"] == "Came from PostgreSQL, not demo_data."
 
 
 def test_sync_persists_event_against_database_backed_integrations(monkeypatch):

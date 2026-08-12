@@ -13,8 +13,8 @@
   /* Text — slate */
   --color-foreground: #1c1f24;
   --color-secondary-foreground: #4a5158;
-  --color-muted-foreground: #6b7280;
-  --color-faint: #9ca3af;
+  --color-muted-foreground: #5c6570;
+  --color-faint: #8b929c;
 
   /* Lines */
   --color-border: #e6e6e3;
@@ -44,6 +44,38 @@
   --radius-lg: 0.625rem;
   --radius-xl: 0.875rem;
   --radius-2xl: 1.125rem;
+}
+
+/* Dark appearance — toggled via `html.dark` from theme preference. */
+html.dark {
+  --color-background: #141618;
+  --color-card: #1c1f24;
+  --color-muted: #22262c;
+  --color-subtle: #191c20;
+
+  --color-foreground: #f2f3f4;
+  --color-secondary-foreground: #c5cad1;
+  --color-muted-foreground: #9aa3ad;
+  --color-faint: #6d7682;
+
+  --color-border: #2c323a;
+  --color-border-strong: #3a424c;
+
+  --color-primary: #34d399;
+  --color-primary-hover: #6ee7b7;
+  --color-primary-foreground: #06281c;
+  --color-primary-soft: #0f2a22;
+  --color-primary-ring: #34d399;
+
+  --color-accent: #f59e0b;
+  --color-accent-strong: #fbbf24;
+  --color-accent-soft: #2a2114;
+
+  --color-critical: #f87171;
+  --color-critical-soft: #2a1616;
+  --color-positive: #34d399;
+  --color-neutral: #9aa3ad;
+  --color-neutral-soft: #22262c;
 }
 
 @layer base {
@@ -110,19 +142,6 @@
       0 8px 24px -12px rgba(28, 31, 36, 0.14);
   }
 
-  .surface-overlay {
-    box-shadow:
-      0 1px 2px rgba(28, 31, 36, 0.06),
-      0 16px 48px -16px rgba(28, 31, 36, 0.22);
-  }
-
-  /* Restrained glass, used only for the sticky page header */
-  .glass {
-    background: rgba(250, 250, 249, 0.82);
-    backdrop-filter: blur(12px) saturate(1.1);
-    -webkit-backdrop-filter: blur(12px) saturate(1.1);
-  }
-
   .numeric {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -139,8 +158,15 @@
     text-wrap: balance;
   }
 
+  /* Theme-aware skeleton pulse — must use CSS variables so dark mode
+     does not paint hard-coded near-white blocks over muted surfaces. */
   .shimmer {
-    background: linear-gradient(90deg, #f1f1ef 0%, #f7f7f5 50%, #f1f1ef 100%);
+    background: linear-gradient(
+      90deg,
+      var(--color-muted) 0%,
+      color-mix(in srgb, var(--color-muted) 55%, var(--color-border)) 45%,
+      var(--color-muted) 100%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.6s ease-in-out infinite;
   }
@@ -190,12 +216,17 @@
   }
 }
 
+/* Scope reduced-motion to our CSS animations only.
+   A global `* { transition-duration: 0.01ms !important }` breaks Framer Motion
+   and can leave content stuck near opacity 0 after route transitions. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .shimmer {
+    animation: none !important;
+    background: var(--color-muted);
+  }
+
+  .pulse-soft {
+    animation: none !important;
+    opacity: 1;
   }
 }

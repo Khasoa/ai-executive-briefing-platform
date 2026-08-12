@@ -5,7 +5,7 @@ Every migrated service (`MeetingService`, `InboxService`, `CRMService`,
 `DailyBrief`) treats two situations the same way: the table is reachable
 but empty (nothing seeded yet), or the database itself is unreachable (not
 migrated, connection dropped, credentials wrong). Both fall back to curated
-`mock_data`, differing only in log level — info for "empty", warning for
+`demo_data`, differing only in log level — info for "empty", warning for
 "error" — because from the caller's point of view both mean "there is
 nothing trustworthy in Postgres right now."
 
@@ -49,14 +49,14 @@ def load_rows_with_fallback(
         rows = query()
     except SQLAlchemyError:
         logger.warning(
-            "Could not read %s — falling back to mock_data", label, exc_info=True
+            "Could not read %s — falling back to demo_data", label, exc_info=True
         )
         if db is not None:
             db.rollback()
         return fallback
 
     if not rows:
-        logger.info("No %s in the database yet — serving mock_data", label)
+        logger.info("No %s in the database yet — serving demo_data", label)
         return fallback
 
     return [to_dict(row) for row in rows]
@@ -84,7 +84,7 @@ def read_with_fallback(
         value = read()
     except SQLAlchemyError:
         logger.warning(
-            "Could not read %s — falling back to mock_data", label, exc_info=True
+            "Could not read %s — falling back to demo_data", label, exc_info=True
         )
         if db is not None:
             db.rollback()
@@ -92,7 +92,7 @@ def read_with_fallback(
 
     if value is None:
         if log_empty:
-            logger.info("No %s in the database yet — serving mock_data", label)
+            logger.info("No %s in the database yet — serving demo_data", label)
         return fallback
 
     return value

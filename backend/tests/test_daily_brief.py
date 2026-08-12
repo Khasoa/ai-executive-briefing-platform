@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.main import app
 from app.schemas.daily_brief import DailyBriefSchema
-from app.services import mock_data
+from app.services import demo_data
 from app.services.daily_brief_service import DailyBriefService
 
 client = TestClient(app)
@@ -24,7 +24,7 @@ def _fake_brief() -> DailyBriefSchema:
                 "id": "pri_db_1",
                 "rank": 1,
                 "title": "Database-sourced priority",
-                "detail": "Came from PostgreSQL, not mock_data.",
+                "detail": "Came from PostgreSQL, not demo_data.",
                 "urgency": "high",
                 "owner": "Lydia",
                 "source": "Notion",
@@ -34,7 +34,7 @@ def _fake_brief() -> DailyBriefSchema:
             {
                 "id": "risk_db_1",
                 "title": "Database-sourced risk",
-                "detail": "Came from PostgreSQL, not mock_data.",
+                "detail": "Came from PostgreSQL, not demo_data.",
                 "severity": "medium",
                 "impact": "Test impact",
                 "mitigation": "Test mitigation",
@@ -74,8 +74,8 @@ def test_overview_falls_back_to_mock_data_when_no_brief_exists(monkeypatch):
     response = client.get("/overview")
     assert response.status_code == 200
     summary = response.json()["executiveSummary"]
-    assert summary["summary"] == mock_data.EXECUTIVE_SUMMARY_TEXT
-    assert summary["priorities"][0]["id"] == mock_data.PRIORITIES[0]["id"]
+    assert summary["summary"] == demo_data.EXECUTIVE_SUMMARY_TEXT
+    assert summary["priorities"][0]["id"] == demo_data.PRIORITIES[0]["id"]
 
 
 def test_overview_falls_back_when_the_database_is_unreachable(monkeypatch):
@@ -86,7 +86,7 @@ def test_overview_falls_back_when_the_database_is_unreachable(monkeypatch):
 
     response = client.get("/overview")
     assert response.status_code == 200
-    assert response.json()["executiveSummary"]["summary"] == mock_data.EXECUTIVE_SUMMARY_TEXT
+    assert response.json()["executiveSummary"]["summary"] == demo_data.EXECUTIVE_SUMMARY_TEXT
 
 
 def test_overview_prefers_the_database_when_a_brief_exists(monkeypatch):
@@ -102,8 +102,12 @@ def test_overview_prefers_the_database_when_a_brief_exists(monkeypatch):
     assert summary["priorities"][0]["id"] == "pri_db_1"
     assert summary["risks"][0]["id"] == "risk_db_1"
 
-    # Only summary/priorities/risks moved to the database — everything else
-    # in this phase is still mock_data, unaffected by which brief was found.
-    assert len(data["kpis"]) == len(mock_data.KPIS)
-    assert len(data["activity"]) == len(mock_data.ACTIVITY)
-    assert len(data["focus"]) == len(mock_data.TODAYS_FOCUS)
+    # Summary/priorities/risks come from the database brief. KPIs / activity /
+    # focus may come from Notion or WorkItem surfaces when those rows exist.
+    assert len(data["kpis"]) >= 1
+    assert isinstance(data["activity"], list)
+    assert len(data["focus"]) >= 1
+    assert all(
+        item.get("type") in ("email", "deal", "document", "meeting", "task")
+        for item in data["activity"]
+    )

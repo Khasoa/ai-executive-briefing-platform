@@ -1,7 +1,7 @@
 """Shared scaffolding for `backend/scripts/seed_*.py`.
 
 Every seed script that writes rows scoped to a user needs the same demo
-user (matching `mock_data.USER`) and the same idempotent "skip what's
+user (matching `demo_data.USER`) and the same idempotent "skip what's
 already there, otherwise insert" loop. Extracted here so each seed script
 only defines its own data and its own idempotency key — everything else
 (the demo user, the insert loop, the print statements) is written once.

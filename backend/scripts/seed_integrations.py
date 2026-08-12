@@ -11,12 +11,12 @@ through the `Integration` ORM model. `IntegrationService` owns reads and
 sync-triggered writes (`status` / `SyncEvent`) but has no "create
 connection" path yet — that waits on OAuth. Integrations need a
 `user_id`, so this script also finds or creates a demo user matching
-`mock_data.USER`.
+`demo_data.USER`.
 
 This does not touch authentication or OAuth: `config` here holds only the
 display metadata (name/category/description/metrics/poweredBy) that the
 model has no dedicated columns for — no real tokens are stored or read.
-Providers match `mock_data.INTEGRATIONS` (Calendar, Gmail, Notion,
+Providers match `demo_data.INTEGRATIONS` (Calendar, Gmail, Notion,
 GoHighLevel, OpenAI, n8n).
 """
 
@@ -113,6 +113,42 @@ INTEGRATIONS = [
                 {"label": "Pipeline", "value": "$2.6M"},
             ],
             "poweredBy": "GoHighLevel API v2",
+        },
+    ),
+    dict(
+        provider="monday",
+        status="not-connected",
+        account=None,
+        scopes=["me:read", "boards:read", "workspaces:read"],
+        last_sync_at=None,
+        connected_at=None,
+        config={
+            "name": "monday.com",
+            "category": "Work management",
+            "description": "Boards, tasks and deadlines that show what needs executive attention.",
+            "metrics": [
+                {"label": "Items synced", "value": "—"},
+                {"label": "Boards", "value": "—"},
+            ],
+            "poweredBy": "monday.com API",
+        },
+    ),
+    dict(
+        provider="clickup",
+        status="not-connected",
+        account=None,
+        scopes=["workspace.read", "tasks.read"],
+        last_sync_at=None,
+        connected_at=None,
+        config={
+            "name": "ClickUp",
+            "category": "Work management",
+            "description": "Tasks, priorities and owners across authorized ClickUp workspaces.",
+            "metrics": [
+                {"label": "Tasks synced", "value": "—"},
+                {"label": "Workspaces", "value": "—"},
+            ],
+            "poweredBy": "ClickUp API",
         },
     ),
     dict(

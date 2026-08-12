@@ -24,11 +24,11 @@ export function MorningBriefCard({
       <Card className={cn("overflow-hidden", tone === "accent" && "border-accent/25")}>
         <header
           className={cn(
-            "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-6 py-4",
-            tone === "accent" ? "bg-accent-soft" : "bg-subtle",
+            "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-3.5 sm:px-6",
+            tone === "accent" ? "bg-accent-soft/70" : "bg-subtle/80",
           )}
         >
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-baseline gap-2.5 sm:gap-3">
             {number && (
               <span
                 className={cn(
@@ -46,10 +46,10 @@ export function MorningBriefCard({
               )}
             </div>
           </div>
-          {meta && <span className="text-[12px] text-muted-foreground numeric">{meta}</span>}
+          {meta && <span className="text-[11px] text-faint numeric">{meta}</span>}
         </header>
 
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </Card>
     </motion.section>
   )

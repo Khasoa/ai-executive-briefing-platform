@@ -19,6 +19,8 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    # Nullable so Google OAuth users can exist without a local password later.
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -35,7 +37,13 @@ class User(Base):
     )
 
     briefs: Mapped[list["MorningBrief"]] = relationship(back_populates="user")
+    daily_briefs: Mapped[list["DailyBrief"]] = relationship(back_populates="user")
     meetings: Mapped[list["Meeting"]] = relationship(back_populates="user")
     emails: Mapped[list["Email"]] = relationship(back_populates="user")
     opportunities: Mapped[list["Opportunity"]] = relationship(back_populates="user")
     integrations: Mapped[list["Integration"]] = relationship(back_populates="user")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
+    ask_reports: Mapped[list["AskReport"]] = relationship(back_populates="user")
+    notion_items: Mapped[list["NotionItem"]] = relationship(back_populates="user")
+    work_items: Mapped[list["WorkItem"]] = relationship(back_populates="user")
+    weekly_digests: Mapped[list["WeeklyDigest"]] = relationship(back_populates="user")

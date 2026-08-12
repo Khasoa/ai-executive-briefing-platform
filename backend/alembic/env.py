@@ -14,7 +14,10 @@ from app.models import (  # noqa: F401 — register models with metadata
     Integration,
     Meeting,
     MorningBrief,
+    OAuthLoginTicket,
+    OAuthState,
     Opportunity,
+    RefreshToken,
     SyncEvent,
     User,
 )

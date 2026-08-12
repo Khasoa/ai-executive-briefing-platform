@@ -37,6 +37,11 @@ export const SIGNAL_DOT = {
 /** Ordered so lists can sort by "what matters most" without duplicating logic. */
 export const SIGNAL_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
 
+/** Badges only for levels that need executive attention — colour bars cover the rest. */
+export function isElevatedSignal(level) {
+  return level === "critical" || level === "high"
+}
+
 export function bySignal(key = "priority") {
   return (a, b) => (SIGNAL_ORDER[a[key]] ?? 9) - (SIGNAL_ORDER[b[key]] ?? 9)
 }
