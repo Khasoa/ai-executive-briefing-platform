@@ -575,11 +575,16 @@ class AIService:
             text = str(value).strip()
             return text or None
 
+        # Prefer `action`; accept `recommended_action` if the model uses that name.
+        action = _nullable_str(raw.get("action"))
+        if action is None:
+            action = _nullable_str(raw.get("recommended_action"))
+
         return {
             "requires_action": bool(raw.get("requires_action")),
             "priority": priority,  # type: ignore[dict-item]
             "category": str(raw.get("category") or "other").strip() or "other",
-            "action": _nullable_str(raw.get("action")),
+            "action": action,
             "deadline": _nullable_str(raw.get("deadline")),
             "reason": str(raw.get("reason") or "").strip()
             or "Insufficient information to triage confidently.",

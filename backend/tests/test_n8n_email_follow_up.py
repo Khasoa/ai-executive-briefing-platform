@@ -301,3 +301,94 @@ def test_normalise_rejects_malformed_json():
     good = AIService._normalise_email_follow_up(ACTION_PAYLOAD)
     assert good is not None
     assert good["priority"] == "high"
+
+
+def test_normalise_accepts_recommended_action_alias():
+    """Model sometimes emits recommended_action instead of action."""
+    raw = {
+        "requires_action": True,
+        "priority": "high",
+        "category": "approval_request",
+        "action": None,
+        "recommended_action": "Approve payment terms in Section 4 by Friday",
+        "deadline": "Friday",
+        "reason": "Explicit approval request with deadline.",
+        "suggested_response": "I'll review Section 4 and confirm by Friday.",
+        "confidence": 0.9,
+    }
+    normalised = AIService._normalise_email_follow_up(raw)
+    assert normalised is not None
+    assert normalised["action"] == "Approve payment terms in Section 4 by Friday"
+
+
+def test_approval_request_empty_action_gets_nonempty_fallback(monkeypatch):
+    """Repro: approval_request + deadline + payment terms, empty action from model.
+
+    Downstream task creation needs a non-empty instruction whenever
+    requires_action is true. API field is `action` (consumers may map it to
+    recommended_action).
+    """
+    _enable_secret(monkeypatch)
+    empty_action_payload = {
+        "requires_action": True,
+        "priority": "high",
+        "category": "approval_request",
+        "action": None,
+        "deadline": "Friday 17:00",
+        "reason": (
+            "Vendor asks for approval of contract payment terms before Friday."
+        ),
+        "suggested_response": (
+            "Thanks — I'll review the payment terms and confirm approval by Friday."
+        ),
+        "confidence": 0.9,
+    }
+    monkeypatch.setattr(
+        AIService,
+        "generate_email_follow_up",
+        lambda self, ctx: empty_action_payload,
+    )
+    monkeypatch.setattr(
+        "app.services.orchestration_service.get_or_create_demo_user",
+        lambda db: _demo_user(),
+    )
+    response = client.post(
+        "/webhooks/n8n/email-follow-up",
+        headers=_headers(),
+        json={
+            "message_id": "msg_approval_empty_action",
+            "thread_id": "thr_approval",
+            "sender": "vendor@legal.example",
+            "subject": "Approval needed: contract payment terms",
+            "received_at": "2026-08-11T09:00:00Z",
+            "body": (
+                "Please approve the updated payment terms in Section 4 of the "
+                "contract by Friday 17:00 so we can proceed with signature."
+            ),
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["requires_action"] is True
+    assert data["category"] == "approval_request"
+    assert data["deadline"] == "Friday 17:00"
+    assert data["reason"]
+    assert data["suggested_response"]
+    assert data["confidence"] == 0.9
+    assert isinstance(data["action"], str)
+    assert data["action"].strip()
+    # Fallback should stay grounded in category / deadline / reason.
+    assert "approve" in data["action"].lower() or "approval" in data["action"].lower()
+
+
+def test_derive_action_fallback_uses_category_deadline_reason():
+    fallback = EmailFollowUpIntelligenceService._derive_action_fallback(
+        {
+            "category": "approval_request",
+            "deadline": "Friday 17:00",
+            "reason": "Sender asks for payment-terms approval by Friday.",
+        }
+    )
+    assert fallback.strip()
+    assert "Friday 17:00" in fallback
+    assert "approve" in fallback.lower() or "approval" in fallback.lower()
