@@ -79,6 +79,13 @@ def email_follow_up_user_prompt(email: dict[str, Any]) -> str:
         "- Approvals, information requests, meeting requests, decisions, "
         "investor/client/vendor responses, explicit deadlines, and important "
         "operational issues normally require_action=true.\n"
+        "- If requires_action is true, action MUST be a non-empty, specific, "
+        "minimal instruction — the single next action the executive should take "
+        "(e.g. 'Review Section 4 payment terms and approve or flag concerns by "
+        "the stated deadline'). Never leave action blank or null when "
+        "requires_action is true. Do not put the draft reply in action; that "
+        "belongs in suggested_response.\n"
+        "- If requires_action is false, action must be null.\n"
         "- Do not infer urgency from unread status (unread is not provided).\n"
         "- Do not invent deadlines, relationships, or business context.\n"
         "- If a deadline is not explicitly stated, deadline must be null.\n"
@@ -444,7 +451,14 @@ EMAIL_FOLLOW_UP_SCHEMA: dict[str, Any] = {
         "requires_action": {"type": "boolean"},
         "priority": {"type": "string", "enum": ["low", "medium", "high"]},
         "category": {"type": "string"},
-        "action": {"type": ["string", "null"]},
+        "action": {
+            "type": ["string", "null"],
+            "description": (
+                "Single next executive instruction. MUST be a non-empty string "
+                "when requires_action is true; must be null when requires_action "
+                "is false."
+            ),
+        },
         "deadline": {"type": ["string", "null"]},
         "reason": {"type": "string"},
         "suggested_response": {"type": ["string", "null"]},
