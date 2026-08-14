@@ -376,28 +376,21 @@ def test_clickup_sync_idempotent_and_archive(monkeypatch):
             assert rows[0].external_id == "clickup:task-1"
             assert rows[0].priority == "urgent"
             assert rows[0].assignee_name == "Sara"
-        finally:
-            db.close()
-
-        # Second sync with empty task list archives missing when no watermark... 
-        # watermark was set after first sync, so empty incremental shouldn't archive.
-        # Force full sync by clearing watermark:
-        db = SessionLocal()
-        try:
             integ = (
                 db.query(Integration)
-                .filter(Integration.user_id == user.id, Integration.provider == "clickup")
+                .filter(Integration.user_id == u.id, Integration.provider == "clickup")
                 .first()
             )
-            cfg = dict(integ.config or {})
-            cfg["clickup"] = {"workspace_id": "t1"}
-            integ.config = cfg
-            db.commit()
+            assert (integ.config or {}).get("clickup", {}).get(
+                "date_updated_watermark_ms"
+            ) is not None
         finally:
             db.close()
 
+        # Second sync with empty task list must archive even WITH watermark present.
         class _EmptyClickUp(_FakeClickUp):
             def list_team_tasks(self, team_id, **kwargs):
+                assert kwargs.get("date_updated_gt") is None
                 return {"last_page": True, "tasks": []}
 
         monkeypatch.setattr(
@@ -414,6 +407,262 @@ def test_clickup_sync_idempotent_and_archive(monkeypatch):
                 .first()
             )
             assert row.archived is True
+            open_count = len(WorkItemService(db).open_items(u))
+            assert open_count == 0
+        finally:
+            db.close()
+    finally:
+        _cleanup(email)
+        get_settings.cache_clear()
+
+
+def test_clickup_reconcile_keeps_remaining_tasks_and_other_providers(monkeypatch):
+    _enable_clickup(monkeypatch)
+    email = f"cu-recon-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        user = _seed_user(email, provider="clickup")
+        db = SessionLocal()
+        try:
+            db.add(
+                WorkItem(
+                    user_id=user.id,
+                    provider="monday",
+                    external_id="monday:keep",
+                    title="Other provider task",
+                    archived=False,
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        tasks = {
+            "task-keep": {
+                "id": "task-keep",
+                "name": "Keep me",
+                "status": {"status": "to do", "type": "open"},
+                "date_updated": "1723100000000",
+                "archived": False,
+                "list": {"id": "l1", "name": "List"},
+            },
+            "task-gone": {
+                "id": "task-gone",
+                "name": "Delete me",
+                "status": {"status": "to do", "type": "open"},
+                "date_updated": "1723100000001",
+                "archived": False,
+                "list": {"id": "l1", "name": "List"},
+            },
+        }
+
+        class _Fake:
+            def __init__(self, *a, **k):
+                pass
+
+            def list_teams(self):
+                return [{"id": "t1", "name": "Team"}]
+
+            def list_team_tasks(self, team_id, **kwargs):
+                assert kwargs.get("date_updated_gt") is None
+                return {"last_page": True, "tasks": list(tasks.values())}
+
+        monkeypatch.setattr(
+            "app.services.clickup_sync_service.ClickUpClient", _Fake
+        )
+        monkeypatch.setattr(
+            "app.services.clickup_sync_service.OAuthService.refresh_provider_access_token",
+            lambda self, user, provider: "tok",
+        )
+
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.email == email).first()
+            ClickUpSyncService(db).sync_user(u, reason="manual")
+            assert (
+                db.query(WorkItem)
+                .filter(WorkItem.user_id == u.id, WorkItem.provider == "clickup")
+                .count()
+                == 2
+            )
+        finally:
+            db.close()
+
+        del tasks["task-gone"]
+
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.email == email).first()
+            ClickUpSyncService(db).sync_user(u, reason="manual")
+            keep = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "clickup:task-keep")
+                .first()
+            )
+            gone = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "clickup:task-gone")
+                .first()
+            )
+            other = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "monday:keep")
+                .first()
+            )
+            assert keep.archived is False
+            assert gone.archived is True
+            assert other.archived is False
+            assert len(WorkItemService(db).open_items(u)) == 2  # keep + monday
+        finally:
+            db.close()
+    finally:
+        _cleanup(email)
+        get_settings.cache_clear()
+
+
+def test_clickup_incomplete_pagination_does_not_archive(monkeypatch):
+    _enable_clickup(monkeypatch)
+    email = f"cu-page-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        user = _seed_user(email, provider="clickup")
+        db = SessionLocal()
+        try:
+            db.add(
+                WorkItem(
+                    user_id=user.id,
+                    provider="clickup",
+                    external_id="clickup:existing",
+                    title="Already synced",
+                    archived=False,
+                )
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        class _Incomplete:
+            def __init__(self, *a, **k):
+                pass
+
+            def list_teams(self):
+                return [{"id": "t1", "name": "Team"}]
+
+            def list_team_tasks(self, team_id, **kwargs):
+                # Never last_page; always returns one task → hits page>50 guard.
+                return {
+                    "last_page": False,
+                    "tasks": [
+                        {
+                            "id": f"page-task-{kwargs.get('page', 0)}",
+                            "name": "Paged",
+                            "status": {"status": "open", "type": "open"},
+                            "date_updated": "1723100000000",
+                            "archived": False,
+                        }
+                    ],
+                }
+
+        monkeypatch.setattr(
+            "app.services.clickup_sync_service.MAX_TASK_PAGES_PER_TEAM",
+            2,
+        )
+        monkeypatch.setattr(
+            "app.services.clickup_sync_service.ClickUpClient", _Incomplete
+        )
+        monkeypatch.setattr(
+            "app.services.clickup_sync_service.OAuthService.refresh_provider_access_token",
+            lambda self, user, provider: "tok",
+        )
+
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.email == email).first()
+            counts = ClickUpSyncService(db).sync_user(u, reason="manual")
+            assert counts.get("pagination_complete") is False
+            existing = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "clickup:existing")
+                .first()
+            )
+            assert existing.archived is False
+        finally:
+            db.close()
+    finally:
+        _cleanup(email)
+        get_settings.cache_clear()
+
+
+def test_monday_reconcile_archives_missing_with_watermark(monkeypatch):
+    _enable_monday(monkeypatch)
+    email = f"mon-recon-{uuid.uuid4().hex[:8]}@example.com"
+    try:
+        user = _seed_user(email, provider="monday")
+        items = {
+            "keep": {
+                "id": "keep",
+                "name": "Keep",
+                "state": "active",
+                "updated_at": "2026-08-08T12:00:00Z",
+                "column_values": [],
+            },
+            "gone": {
+                "id": "gone",
+                "name": "Gone",
+                "state": "active",
+                "updated_at": "2026-08-08T12:00:00Z",
+                "column_values": [],
+            },
+        }
+
+        class _FakeMonday:
+            def __init__(self, *a, **k):
+                pass
+
+            def list_boards(self, limit=40):
+                return [{"id": "b1", "name": "Board", "workspace_id": "ws-1"}]
+
+            def list_board_items(self, board_id, *, limit=50, cursor=None):
+                return {"cursor": None, "items": list(items.values())}
+
+        monkeypatch.setattr(
+            "app.services.monday_sync_service.MondayClient", _FakeMonday
+        )
+        monkeypatch.setattr(
+            "app.services.monday_sync_service.OAuthService.refresh_provider_access_token",
+            lambda self, user, provider: "tok",
+        )
+
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.email == email).first()
+            MondaySyncService(db).sync_user(u, reason="manual")
+            integ = (
+                db.query(Integration)
+                .filter(Integration.user_id == u.id, Integration.provider == "monday")
+                .first()
+            )
+            assert (integ.config or {}).get("monday", {}).get(
+                "items_updated_watermark"
+            )
+        finally:
+            db.close()
+
+        del items["gone"]
+        db = SessionLocal()
+        try:
+            u = db.query(User).filter(User.email == email).first()
+            MondaySyncService(db).sync_user(u, reason="manual")
+            keep = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "monday:keep")
+                .first()
+            )
+            gone = (
+                db.query(WorkItem)
+                .filter(WorkItem.external_id == "monday:gone")
+                .first()
+            )
+            assert keep.archived is False
+            assert gone.archived is True
         finally:
             db.close()
     finally:

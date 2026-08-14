@@ -19,6 +19,8 @@ logger = logging.getLogger("briefly.clickup_sync")
 PROVIDER = "clickup"
 SOURCE = "ClickUp"
 EXTERNAL_PREFIX = "clickup:"
+# Safety cap — incomplete pagination skips archive reconcile.
+MAX_TASK_PAGES_PER_TEAM = 50
 
 PRIORITY_MAP = {
     1: "urgent",
@@ -69,6 +71,7 @@ class ClickUpSyncService:
             "archived": counts.get("archived", 0),
             "teams": counts.get("teams", 0),
             "pages": counts.get("pages", 0),
+            "pagination_complete": bool(counts.get("pagination_complete", True)),
         }
 
     def _sync_teams(
@@ -84,6 +87,11 @@ class ClickUpSyncService:
         pages = 0
         max_updated: int | None = watermark_ms
         seen: set[str] = set()
+        # Full listing is required so `seen` is complete before soft-archive.
+        # Incremental date_updated_gt would omit unchanged tasks and wrongly
+        # archive them (or skip reconcile entirely). Watermark is still tracked
+        # for meta/diagnostics but must not filter the reconcile listing.
+        pagination_complete = True
 
         for team in teams:
             team_id = str(team.get("id") or "")
@@ -96,7 +104,7 @@ class ClickUpSyncService:
                     team_id,
                     page=page,
                     include_closed=True,
-                    date_updated_gt=watermark_ms,
+                    date_updated_gt=None,
                     subtasks=True,
                 )
                 pages += 1
@@ -104,11 +112,17 @@ class ClickUpSyncService:
                 for raw in tasks:
                     if not isinstance(raw, dict):
                         continue
+                    task_id = raw.get("id")
+                    if task_id:
+                        seen.add(f"{EXTERNAL_PREFIX}{task_id}")
                     updated_ms = _as_int(raw.get("date_updated"))
                     if updated_ms is not None and (
                         max_updated is None or updated_ms > max_updated
                     ):
                         max_updated = updated_ms
+                    # Still upsert everything from the full listing so archive
+                    # flags and fields stay current; watermark is not used to
+                    # skip rows during reconcile.
                     if self._upsert_task(
                         user,
                         raw,
@@ -116,18 +130,27 @@ class ClickUpSyncService:
                         workspace_name=team_name,
                     ):
                         upserted += 1
-                        seen.add(f"{EXTERNAL_PREFIX}{raw.get('id')}")
                     if raw.get("archived"):
                         archived += 1
                 # ClickUp returns last_page boolean on filtered team tasks.
                 if payload.get("last_page") is True or not tasks:
                     break
                 page += 1
-                if page > 50:
+                if page > MAX_TASK_PAGES_PER_TEAM:
+                    pagination_complete = False
+                    logger.warning(
+                        "ClickUp pagination incomplete for team %s — skipping archive reconcile",
+                        team_id,
+                    )
                     break
 
-        if watermark_ms is None:
+        if pagination_complete:
             archived += self._archive_missing(user, seen)
+        else:
+            logger.warning(
+                "ClickUp sync pagination incomplete for user %s — not archiving missing tasks",
+                user.id,
+            )
 
         return {
             "upserted": upserted,
@@ -135,6 +158,7 @@ class ClickUpSyncService:
             "teams": len(teams),
             "pages": pages,
             "max_updated_ms": max_updated,
+            "pagination_complete": pagination_complete,
         }
 
     def _upsert_task(
