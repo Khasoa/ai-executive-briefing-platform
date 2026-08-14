@@ -1,18 +1,31 @@
 import logging
 from copy import deepcopy
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import Settings, get_settings
-from app.models import Integration, SyncEvent, User
+from app.models import (
+    Email,
+    Integration,
+    Meeting,
+    MorningBrief,
+    NotionItem,
+    Opportunity,
+    SyncEvent,
+    User,
+    WorkItem,
+)
 from app.schemas.integrations import IntegrationCheckResponse, IntegrationsResponse
 from app.services import demo_data
 from app.services.db_fallback import load_rows_with_fallback
 from app.services.demo_user import is_demo_user
+from app.services.email_classification import EXECUTIVE_PRIORITY_CATEGORIES
 from app.services.integration_catalog import (
     SUPPORTED_INTEGRATIONS,
     auth_type_for,
@@ -20,6 +33,7 @@ from app.services.integration_catalog import (
     resolve_row_for_entry,
 )
 from app.services.mapping_utils import jsonb_or_default, relative_time_label, stringify_id
+from app.services.time_windows import local_day_bounds, local_today
 
 logger = logging.getLogger("briefly.integrations")
 
@@ -291,6 +305,7 @@ class IntegrationService:
         """Return the full supported catalog merged with this user's connection rows."""
         rows = self._load_user_integration_rows()
         rows_by_provider = {row.provider: row for row in rows}
+        live_counts = self._load_live_metric_counts()
         demo_by_id = (
             {item["id"]: item for item in demo_data.INTEGRATIONS}
             if is_demo_user(self.user)
@@ -304,13 +319,17 @@ class IntegrationService:
             auth_type = auth_type_for(entry)
 
             if auth_type in ("api_key", "webhook"):
-                result.append(self._env_config_entry(entry))
+                result.append(self._env_config_entry(entry, live_counts))
                 consumed_providers.update(entry["provider_keys"])
                 continue
 
             row = resolve_row_for_entry(entry, rows_by_provider)
             if row is not None:
-                result.append(self._merge_catalog_entry(entry, row, rows_by_provider))
+                result.append(
+                    self._merge_catalog_entry(
+                        entry, row, rows_by_provider, live_counts=live_counts
+                    )
+                )
                 consumed_providers.update(entry["provider_keys"])
                 continue
 
@@ -336,11 +355,204 @@ class IntegrationService:
 
         return result
 
-    def _env_config_entry(self, entry: dict) -> dict:
+    def _load_live_metric_counts(self) -> dict[str, Any]:
+        """Batch COUNT queries for integration-card metrics (no external API calls)."""
+        uid = self.user.id
+        empty: dict[str, Any] = {
+            "meetings_today": 0,
+            "emails_total": 0,
+            "emails_needs_reply": 0,
+            "work_clickup": 0,
+            "work_monday": 0,
+            "clickup_workspaces": 0,
+            "monday_boards": 0,
+            "notion_pages": 0,
+            "notion_databases": 0,
+            "opportunities": 0,
+            "briefs": 0,
+        }
+        try:
+            day_start, day_end = local_day_bounds(self.user, local_today(self.user))
+            meetings_today = (
+                self.db.query(func.count(Meeting.id))
+                .filter(
+                    Meeting.user_id == uid,
+                    Meeting.starts_at.isnot(None),
+                    Meeting.starts_at >= day_start,
+                    Meeting.starts_at <= day_end,
+                )
+                .scalar()
+                or 0
+            )
+            emails_total = (
+                self.db.query(func.count(Email.id))
+                .filter(Email.user_id == uid)
+                .scalar()
+                or 0
+            )
+            emails_needs_reply = (
+                self.db.query(func.count(Email.id))
+                .filter(
+                    Email.user_id == uid,
+                    Email.category.in_(tuple(EXECUTIVE_PRIORITY_CATEGORIES)),
+                )
+                .scalar()
+                or 0
+            )
+            work_rows = (
+                self.db.query(
+                    WorkItem.provider,
+                    func.count(WorkItem.id),
+                    func.count(func.distinct(WorkItem.workspace_id)),
+                    func.count(func.distinct(WorkItem.container_id)),
+                )
+                .filter(
+                    WorkItem.user_id == uid,
+                    WorkItem.archived.is_(False),
+                    WorkItem.provider.in_(("clickup", "monday")),
+                )
+                .group_by(WorkItem.provider)
+                .all()
+            )
+            work_clickup = work_monday = clickup_workspaces = monday_boards = 0
+            for provider, total, workspaces, containers in work_rows:
+                if provider == "clickup":
+                    work_clickup = int(total or 0)
+                    clickup_workspaces = int(workspaces or 0)
+                elif provider == "monday":
+                    work_monday = int(total or 0)
+                    monday_boards = int(containers or 0)
+
+            notion_pages = (
+                self.db.query(func.count(NotionItem.id))
+                .filter(
+                    NotionItem.user_id == uid,
+                    NotionItem.archived.is_(False),
+                )
+                .scalar()
+                or 0
+            )
+            notion_databases = (
+                self.db.query(func.count(func.distinct(NotionItem.parent_database_id)))
+                .filter(
+                    NotionItem.user_id == uid,
+                    NotionItem.archived.is_(False),
+                    NotionItem.parent_database_id.isnot(None),
+                )
+                .scalar()
+                or 0
+            )
+            opportunities = (
+                self.db.query(func.count(Opportunity.id))
+                .filter(Opportunity.user_id == uid)
+                .scalar()
+                or 0
+            )
+            briefs = (
+                self.db.query(func.count(MorningBrief.id))
+                .filter(MorningBrief.user_id == uid)
+                .scalar()
+                or 0
+            )
+            return {
+                "meetings_today": int(meetings_today),
+                "emails_total": int(emails_total),
+                "emails_needs_reply": int(emails_needs_reply),
+                "work_clickup": work_clickup,
+                "work_monday": work_monday,
+                "clickup_workspaces": clickup_workspaces,
+                "monday_boards": monday_boards,
+                "notion_pages": int(notion_pages),
+                "notion_databases": int(notion_databases),
+                "opportunities": int(opportunities),
+                "briefs": int(briefs),
+            }
+        except SQLAlchemyError:
+            logger.warning(
+                "Could not load live integration metrics for user %s",
+                self.user.id,
+                exc_info=True,
+            )
+            self.db.rollback()
+            return empty
+
+    @staticmethod
+    def _metric(label: str, value: str) -> dict[str, str]:
+        return {"label": label, "value": value}
+
+    def _live_metrics_for(
+        self,
+        entry_id: str,
+        *,
+        config: dict,
+        live_counts: dict[str, Any],
+        connected: bool,
+    ) -> list[dict[str, str]] | None:
+        """Build live card metrics for a connected/configured provider.
+
+        Returns None when the caller should keep catalog/disconnected placeholders.
+        Numeric zeros are returned as ``\"0\"``, never ``\"—\"``.
+        """
+        if not connected:
+            return None
+        counts = live_counts or {}
+
+        if entry_id == "google-calendar":
+            calendars = "1"  # primary calendar sync scope
+            return [
+                self._metric("Meetings today", str(counts.get("meetings_today", 0))),
+                self._metric("Calendars", calendars),
+            ]
+        if entry_id == "gmail":
+            return [
+                self._metric("Threads indexed", str(counts.get("emails_total", 0))),
+                self._metric("Needs reply", str(counts.get("emails_needs_reply", 0))),
+            ]
+        if entry_id == "clickup":
+            workspaces = counts.get("clickup_workspaces", 0)
+            meta = (config or {}).get("clickup") or {}
+            team_ids = meta.get("team_ids") or []
+            if isinstance(team_ids, list) and team_ids:
+                workspaces = max(workspaces, len(team_ids))
+            return [
+                self._metric("Tasks synced", str(counts.get("work_clickup", 0))),
+                self._metric("Workspaces", str(workspaces)),
+            ]
+        if entry_id == "monday":
+            boards = counts.get("monday_boards", 0)
+            return [
+                self._metric("Items synced", str(counts.get("work_monday", 0))),
+                self._metric("Boards", str(boards)),
+            ]
+        if entry_id == "notion":
+            databases = counts.get("notion_databases", 0)
+            meta = (config or {}).get("notion") or {}
+            selected = meta.get("selected_database_ids") or meta.get(
+                "discovered_database_ids"
+            ) or []
+            if isinstance(selected, list) and selected:
+                databases = max(databases, len(selected))
+            return [
+                self._metric("Pages indexed", str(counts.get("notion_pages", 0))),
+                self._metric("Databases", str(databases)),
+            ]
+        if entry_id == "gohighlevel":
+            # Pipeline name is not reliably persisted — keep that metric as "—" only.
+            return [
+                self._metric("Opportunities", str(counts.get("opportunities", 0))),
+                self._metric("Pipeline", "—"),
+            ]
+        return None
+
+    def _env_config_entry(
+        self, entry: dict, live_counts: dict[str, Any] | None = None
+    ) -> dict:
         """OpenAI / n8n cards driven by server env — never OAuth, never secrets."""
         base = disconnected_entry(entry)
+        live_counts = live_counts or {}
         if entry["id"] == "openai":
             configured = bool(self.settings.openai_api_key.strip())
+            briefs = str(live_counts.get("briefs", 0)) if configured else "—"
             base.update(
                 {
                     "status": "configured" if configured else "not-connected",
@@ -356,7 +568,7 @@ class IntegrationService:
                             "label": "Model",
                             "value": self.settings.openai_model if configured else "—",
                         },
-                        {"label": "Briefs generated", "value": "—"},
+                        {"label": "Briefs generated", "value": briefs},
                     ],
                     "canSync": False,
                     "canConnect": False,
@@ -368,6 +580,7 @@ class IntegrationService:
 
         if entry["id"] == "n8n":
             configured = bool(self.settings.n8n_webhook_secret.strip())
+            # No trustworthy persisted n8n run counter — keep "—" rather than inventing.
             base.update(
                 {
                     "status": "configured" if configured else "not-connected",
@@ -380,7 +593,7 @@ class IntegrationService:
                         else "Webhook secret required on the API server"
                     ),
                     "metrics": [
-                        {"label": "Workflows", "value": "Webhook"},
+                        {"label": "Workflows", "value": "Webhook" if configured else "—"},
                         {"label": "Runs this month", "value": "—"},
                     ],
                     "canSync": False,
@@ -415,6 +628,8 @@ class IntegrationService:
         entry: dict,
         row: Integration,
         rows_by_provider: dict[str, Integration],
+        *,
+        live_counts: dict[str, Any] | None = None,
     ) -> dict:
         config = jsonb_or_default(row.config)
         auth_type = auth_type_for(entry)
@@ -448,12 +663,21 @@ class IntegrationService:
                 "Sync failed — try Sync again"
             )
 
-        metrics = config.get("metrics")
-        if not metrics:
-            metrics = deepcopy(entry["metrics"])
+        oauth_connected = status_value in ("connected", "syncing", "error")
+        live = self._live_metrics_for(
+            entry["id"],
+            config=config if isinstance(config, dict) else {},
+            live_counts=live_counts or {},
+            connected=oauth_connected,
+        )
+        if live is not None:
+            metrics = live
+        else:
+            metrics = config.get("metrics") if isinstance(config, dict) else None
+            if not metrics:
+                metrics = deepcopy(entry["metrics"])
 
         scopes = list(row.scopes or []) or list(entry["scopes"])
-        oauth_connected = status_value in ("connected", "syncing", "error")
 
         return {
             "id": entry["id"],

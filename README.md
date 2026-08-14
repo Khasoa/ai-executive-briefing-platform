@@ -80,6 +80,24 @@ uvicorn app.main:app --reload --port 8000
 
 API docs: [http://localhost:8000/docs](http://localhost:8000/docs). Migrations: [docs/migrations.md](docs/migrations.md). Backend onboarding: [backend/README.md](backend/README.md).
 
+## Deployment
+
+Briefly uses a split production deployment:
+
+- **Frontend** — React/Vite deployed on Vercel
+- **Backend** — FastAPI deployed on Railway
+- **Database** — PostgreSQL hosted on Railway
+- **Automation** — n8n handles scheduled synchronization and briefing workflows
+
+Production URLs:
+
+- Frontend: `https://ai-executive-briefing-platform.vercel.app`
+- Backend: `https://briefly-production-5b08.up.railway.app`
+
+The frontend communicates with the deployed backend through `VITE_API_URL`. Production OAuth callbacks and CORS origins must use the deployed frontend/backend URLs rather than localhost values.
+
+No additional environment variables or database migrations are required for the current integration metrics, task reconciliation, or meeting-intelligence fixes.
+
 ### Frontend
 
 ```bash

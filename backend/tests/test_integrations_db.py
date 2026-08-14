@@ -72,11 +72,18 @@ class _FakeQuery:
     def join(self, *args, **kwargs):
         return self
 
+    def group_by(self, *args, **kwargs):
+        return self
+
     def all(self):
         return list(self._rows)
 
     def first(self):
         return self._rows[0] if self._rows else None
+
+    def scalar(self):
+        # Live metric COUNTs hit this path under the fake session.
+        return 0
 
 
 def _patch_session(monkeypatch, *, integrations=None, sync_events=None, raise_error=False):
@@ -96,6 +103,9 @@ def _patch_session(monkeypatch, *, integrations=None, sync_events=None, raise_er
     def _fake_query(self, model, *args, **kwargs):
         if raise_error:
             raise SQLAlchemyError("connection refused")
+        # COUNT / multi-column metric queries are not model-keyed.
+        if not isinstance(model, type) or model not in tables:
+            return _FakeQuery([])
         return _FakeQuery(tables.get(model, []))
 
     def _add(self, instance):

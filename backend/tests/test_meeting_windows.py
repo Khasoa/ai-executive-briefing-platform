@@ -14,7 +14,11 @@ from app.models import Email, Meeting, RefreshToken, User, WeeklyDigest
 from app.services.ai_service import AIService
 from app.services.auth_service import AuthService
 from app.services.meeting_intelligence import MeetingIntelligenceService
-from app.services.meeting_windows import classify_meeting_at, prep_recommended_for_window
+from app.services.meeting_windows import (
+    classify_meeting_at,
+    prep_recommended_for_meeting,
+    prep_recommended_for_window,
+)
 from app.services.morning_brief_service import MorningBriefService
 from app.services.overview_service import OverviewService
 
@@ -134,6 +138,93 @@ def test_prep_recommended_only_for_today():
     assert prep_recommended_for_window("later", "needs-prep") is False
 
 
+def test_prep_recommended_rolling_24h_horizon():
+    user = User(
+        id=uuid.uuid4(),
+        email="prep@example.com",
+        hashed_password="!",
+        name="P",
+        full_name="P",
+        role="CEO",
+        company="T",
+        avatar="P",
+        timezone="UTC",
+        is_active=True,
+        preferences={},
+    )
+    now = datetime(2026, 8, 14, 12, 0, tzinfo=timezone.utc)
+
+    assert prep_recommended_for_meeting(
+        now + timedelta(minutes=30), "needs-prep", user, now=now
+    )
+    assert prep_recommended_for_meeting(
+        now + timedelta(hours=6), "needs-prep", user, now=now
+    )
+    assert prep_recommended_for_meeting(
+        now + timedelta(hours=23), "needs-prep", user, now=now
+    )
+    # Inclusive far boundary
+    assert prep_recommended_for_meeting(
+        now + timedelta(hours=24), "needs-prep", user, now=now
+    )
+    assert not prep_recommended_for_meeting(
+        now + timedelta(hours=25), "needs-prep", user, now=now
+    )
+    assert not prep_recommended_for_meeting(
+        now + timedelta(days=3), "needs-prep", user, now=now
+    )
+    # Tomorrow morning within 24h from noon
+    assert prep_recommended_for_meeting(
+        now + timedelta(hours=18), "needs-prep", user, now=now
+    )
+    # September / October — not eligible
+    assert not prep_recommended_for_meeting(
+        datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc),
+        "needs-prep",
+        user,
+        now=now,
+    )
+    assert not prep_recommended_for_meeting(
+        datetime(2026, 10, 14, 10, 0, tzinfo=timezone.utc),
+        "needs-prep",
+        user,
+        now=now,
+    )
+    # Past
+    assert not prep_recommended_for_meeting(
+        now - timedelta(hours=1), "needs-prep", user, now=now
+    )
+    # Already prepared
+    assert not prep_recommended_for_meeting(
+        now + timedelta(hours=2), "ready", user, now=now
+    )
+
+
+def test_prep_horizon_respects_user_timezone_africa_nairobi():
+    user = User(
+        id=uuid.uuid4(),
+        email="nairobi@example.com",
+        hashed_password="!",
+        name="N",
+        full_name="N",
+        role="CEO",
+        company="T",
+        avatar="N",
+        timezone="Africa/Nairobi",
+        is_active=True,
+        preferences={},
+    )
+    # 22:00 UTC = 01:00 next day Nairobi (UTC+3)
+    now = datetime(2026, 8, 14, 22, 0, tzinfo=timezone.utc)
+    # 20 hours later = still within 24h
+    assert prep_recommended_for_meeting(
+        now + timedelta(hours=20), "needs-prep", user, now=now
+    )
+    assert not prep_recommended_for_meeting(
+        now + timedelta(hours=26), "needs-prep", user, now=now
+    )
+
+
 def test_timezone_midnight_boundary_athens():
     """23:30 UTC Aug 10 is already Aug 11 in Europe/Athens (+3)."""
     user = User(timezone="Europe/Athens")
@@ -178,10 +269,27 @@ def test_api_windows_and_counts():
         assert "Next month kickoff" in later_titles or "Monthly writers call" in later_titles
         past_titles = {m["title"] for m in data["windows"]["past"]}
         assert "Past retro" in past_titles
-        # Future meeting must not be flagged prepare-today.
+        # Prep uses a rolling 24h horizon — tomorrow within 24h may be eligible;
+        # meetings beyond that must not be flagged.
+        horizon = now + timedelta(hours=24)
         for section in ("tomorrow", "thisWeek", "thisMonth", "later"):
             for m in data["windows"][section]:
+                starts = m.get("startsAt")
+                if not starts:
+                    assert m["prepRecommended"] is False
+                    continue
+                start_dt = datetime.fromisoformat(starts.replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                within = now <= start_dt <= horizon
+                assert m["prepRecommended"] is within, m["title"]
+        for m in data["windows"]["later"] + data["windows"]["thisMonth"]:
+            if m["title"] in ("Next month kickoff", "Monthly writers call", "Later this month"):
                 assert m["prepRecommended"] is False
+        # Ensure far-future September/October-class meetings stay out of prep.
+        assert all(
+            m["prepRecommended"] is False for m in data["windows"]["later"]
+        )
     finally:
         _cleanup(email)
 

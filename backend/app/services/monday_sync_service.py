@@ -89,6 +89,7 @@ class MondaySyncService:
         boards = client.list_boards(limit=40)
         max_updated: str | None = watermark
         seen_external: set[str] = set()
+        pagination_complete = True
 
         for board in boards:
             board_id = str(board.get("id") or "")
@@ -104,11 +105,16 @@ class MondaySyncService:
                 for raw in items:
                     if not isinstance(raw, dict):
                         continue
+                    item_id = raw.get("id")
+                    if item_id:
+                        # Always record presence for reconcile — even when we
+                        # skip content upsert for unchanged watermarked rows.
+                        seen_external.add(f"{EXTERNAL_PREFIX}{item_id}")
                     updated = raw.get("updated_at")
-                    if watermark and updated and updated <= watermark:
-                        continue
                     if updated and (max_updated is None or updated > max_updated):
                         max_updated = updated
+                    if watermark and updated and updated <= watermark:
+                        continue
                     if self._upsert_item(
                         user,
                         raw,
@@ -118,16 +124,27 @@ class MondaySyncService:
                         workspace_name=workspace_name,
                     ):
                         upserted += 1
-                        seen_external.add(f"{EXTERNAL_PREFIX}{raw.get('id')}")
                     if (raw.get("state") or "").lower() == "archived":
                         archived += 1
                 cursor = page.get("cursor")
                 if not cursor or not items:
                     break
+                if pages > 200:
+                    pagination_complete = False
+                    logger.warning(
+                        "monday.com pagination incomplete for board %s — skipping archive",
+                        board_id,
+                    )
+                    break
 
-        # Soft-archive open monday items missing from this sync when full (no watermark).
-        if not watermark:
+        # Soft-archive open monday items missing from the complete remote set.
+        if pagination_complete:
             archived += self._archive_missing(user, seen_external)
+        else:
+            logger.warning(
+                "monday.com sync pagination incomplete for user %s — not archiving missing items",
+                user.id,
+            )
 
         return {
             "upserted": upserted,
@@ -135,6 +152,7 @@ class MondaySyncService:
             "boards": len(boards),
             "pages": pages,
             "max_updated_at": max_updated,
+            "pagination_complete": pagination_complete,
         }
 
     def _upsert_item(

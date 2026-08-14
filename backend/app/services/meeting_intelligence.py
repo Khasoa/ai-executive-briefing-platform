@@ -18,13 +18,14 @@ from app.services.meeting_windows import (
     WINDOW_ORDER,
     classify_meeting_at,
     dedupe_meetings_by_title_start,
-    prep_recommended_for_window,
+    ensure_aware,
+    prep_recommended_for_meeting,
     relative_meeting_label,
     short_date_label,
     timing_display_label,
     weekday_date_label,
 )
-from app.services.time_windows import local_day_bounds, local_today
+from app.services.time_windows import local_day_bounds, local_today, user_zone
 
 logger = logging.getLogger("briefly.meeting_intelligence")
 
@@ -58,7 +59,9 @@ class MeetingIntelligenceService:
     def enrich_meeting_row(self, row: Meeting) -> dict[str, Any]:
         window = classify_meeting_at(row.starts_at, self.user)
         prep_status = row.prep_status or "needs-prep"
-        prep_recommended = prep_recommended_for_window(window, prep_status)
+        prep_recommended = prep_recommended_for_meeting(
+            row.starts_at, prep_status, self.user
+        )
         intelligence = jsonb_or_default(row.intelligence)
         company = _normalize_company(jsonb_or_default(row.company))
         google = intelligence.get("google") if isinstance(intelligence.get("google"), dict) else {}
@@ -80,13 +83,17 @@ class MeetingIntelligenceService:
             or ""
         )
 
+        zone = user_zone(self.user)
+        start_local = ensure_aware(row.starts_at).astimezone(zone) if row.starts_at else None
+        end_local = ensure_aware(row.ends_at).astimezone(zone) if row.ends_at else None
+
         return {
             "id": stringify_id(row.id),
             "title": row.title,
             "startsAt": row.starts_at.isoformat() if row.starts_at else None,
             "endsAt": row.ends_at.isoformat() if row.ends_at else None,
-            "startTime": row.starts_at.strftime("%H:%M") if row.starts_at else "",
-            "endTime": row.ends_at.strftime("%H:%M") if row.ends_at else "",
+            "startTime": start_local.strftime("%H:%M") if start_local else "",
+            "endTime": end_local.strftime("%H:%M") if end_local else "",
             "duration": _format_duration(row.starts_at, row.ends_at),
             "dateLabel": short_date_label(row.starts_at, self.user),
             "weekdayDateLabel": weekday_date_label(row.starts_at, self.user),
@@ -141,7 +148,12 @@ class MeetingIntelligenceService:
         return [m for m in self.load_classified_meetings(include_past=False) if m["window"] == "today"]
 
     def todays_prep_meetings(self) -> list[dict[str, Any]]:
-        return [m for m in self.todays_meetings() if m.get("prepRecommended")]
+        """Meetings inside the rolling 24h prep horizon that still need prep."""
+        return [
+            m
+            for m in self.load_classified_meetings(include_past=False)
+            if m.get("prepRecommended")
+        ]
 
     def this_week_upcoming(self) -> list[dict[str, Any]]:
         """Tomorrow + remainder of this week (not today)."""
@@ -154,7 +166,7 @@ class MeetingIntelligenceService:
     def build_prep_context(self, meeting: dict[str, Any] | Meeting) -> dict[str, Any]:
         """Deterministic related context for a meeting — never invents facts.
 
-        Full prepare-today treatment only for today's meetings. Future meetings
+        Full prep treatment only inside the rolling 24h horizon. Other meetings
         get a light upcoming note instead.
         """
         if isinstance(meeting, Meeting):
@@ -162,8 +174,7 @@ class MeetingIntelligenceService:
         else:
             data = dict(meeting)
 
-        window = data.get("window") or "later"
-        if window != "today":
+        if not data.get("prepRecommended"):
             return {
                 **data,
                 "relatedEmailMatches": [],
@@ -178,7 +189,7 @@ class MeetingIntelligenceService:
                 },
                 "whyItMatters": (
                     f"Scheduled {data.get('timingLabel') or data.get('relativeLabel') or 'later'} — "
-                    "not a today preparation item."
+                    "not in the next-24-hour preparation window."
                 ),
                 "suggestedPrepActions": [
                     "Upcoming — preparation not yet needed.",
@@ -223,7 +234,7 @@ class MeetingIntelligenceService:
 
         suggested_actions: list[str] = []
         highlights: list[str] = []
-        if data.get("prepRecommended") or window == "today":
+        if data.get("prepRecommended"):
             if related_emails:
                 suggested_actions.append(
                     f"Review {len(related_emails)} related email thread(s) before the meeting."
