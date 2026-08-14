@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom"
-import { ArrowRight, CalendarRange, Sun } from "lucide-react"
+import { CalendarRange, Sun } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { PageHeader, SectionHeading } from "@/components/common/PageHeader"
 import { RefreshButton } from "@/components/common/RefreshButton"
-import { ActivityFeed } from "@/components/common/ActivityFeed"
 import { ExecutiveSummaryCard } from "@/components/cards/ExecutiveSummaryCard"
 import { KPIGrid } from "@/components/cards/KPIWidget"
 import { RecommendationCard } from "@/components/cards/RecommendationCard"
@@ -24,7 +23,7 @@ export function OverviewPage() {
   if (loading) return <OverviewSkeleton />
   if (error) return <PageError error={error} onRetry={refetch} />
 
-  const { user, brief, executiveSummary, kpis, activity, focus } = data
+  const { user, brief, executiveSummary, kpis, focus } = data
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7 lg:px-10">
@@ -61,8 +60,8 @@ export function OverviewPage() {
         <KPIGrid kpis={kpis} />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-7">
-        <section className="lg:col-span-2">
+      <div className="mt-8">
+        <section>
           <SectionHeading title="Today's focus" />
           {focus.length === 0 ? (
             <EmptyState
@@ -81,32 +80,6 @@ export function OverviewPage() {
                 />
               ))}
             </div>
-          )}
-        </section>
-
-        <section>
-          <SectionHeading
-            title="Overnight"
-            action={
-              <Link
-                to="/inbox"
-                className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-ring/40"
-              >
-                Inbox
-                <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-              </Link>
-            }
-          />
-          {activity.length === 0 ? (
-            <EmptyState
-              title="No overnight activity"
-              description="When recent Gmail, Calendar, CRM or work-management changes sync, they appear here — including ordinary email volume."
-              actionLabel="Check integrations"
-              actionTo="/integrations"
-              className="py-8"
-            />
-          ) : (
-            <ActivityFeed items={activity} />
           )}
         </section>
       </div>

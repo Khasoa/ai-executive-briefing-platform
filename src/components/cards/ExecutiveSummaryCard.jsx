@@ -31,12 +31,20 @@ function Panel({ icon: Icon, title, count, children, className }) {
 export function ExecutiveSummaryCard({ summary, brief }) {
   const {
     summary: narrative,
-    priorities,
-    risks,
-    meetingsToPrepare,
-    clientsNeedingAttention,
-    recommendedActions,
+    priorities = [],
+    risks = [],
+    meetingsToPrepare = [],
+    clientsNeedingAttention = [],
+    recommendedActions = [],
   } = summary
+
+  const hasPriorities = priorities.length > 0
+  const hasRisks = risks.length > 0
+  const hasPrep = meetingsToPrepare.length > 0
+  const hasClients = clientsNeedingAttention.length > 0
+  const hasActions = recommendedActions.length > 0
+  const hasAnyCategory = hasPriorities || hasRisks || hasPrep || hasClients || hasActions
+  const hasGridCategory = hasRisks || hasPrep || hasClients || hasActions
 
   return (
     <motion.div {...fadeUp}>
@@ -65,125 +73,145 @@ export function ExecutiveSummaryCard({ summary, brief }) {
             {narrative}
           </p>
 
-          <div className="mt-5">
-            <Panel icon={CircleCheck} title="Priorities" count={priorities.length}>
-              <ol className="space-y-1">
-                {priorities.slice(0, 4).map((priority, index) => (
-                  <li
-                    key={priority.id}
-                    className="flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-subtle sm:px-2.5"
-                  >
-                    <span
-                      className={cn(
-                        "mt-1 h-4 w-0.5 shrink-0 rounded-full",
-                        SIGNAL_ACCENT_BAR[priority.urgency],
-                      )}
-                      aria-hidden="true"
-                    />
-                    <span className="w-4 shrink-0 pt-px text-[13px] font-semibold text-faint numeric">
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground">
-                      {priority.title}
-                    </span>
-                    {isElevatedSignal(priority.urgency) && (
-                      <Badge variant={SIGNAL_BADGE[priority.urgency]}>
-                        {SIGNAL_LABEL[priority.urgency]}
-                      </Badge>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </Panel>
-          </div>
+          {!hasAnyCategory ? (
+            <p className="mt-5 text-[13px] text-muted-foreground">
+              Nothing outstanding in today&apos;s brief categories.
+            </p>
+          ) : (
+            <>
+              {hasPriorities ? (
+                <div className="mt-5">
+                  <Panel icon={CircleCheck} title="Priorities" count={priorities.length}>
+                    <ol className="space-y-1">
+                      {priorities.slice(0, 4).map((priority, index) => (
+                        <li
+                          key={priority.id}
+                          className="flex items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-subtle sm:px-2.5"
+                        >
+                          <span
+                            className={cn(
+                              "mt-1 h-4 w-0.5 shrink-0 rounded-full",
+                              SIGNAL_ACCENT_BAR[priority.urgency],
+                            )}
+                            aria-hidden="true"
+                          />
+                          <span className="w-4 shrink-0 pt-px text-[13px] font-semibold text-faint numeric">
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground">
+                            {priority.title}
+                          </span>
+                          {isElevatedSignal(priority.urgency) && (
+                            <Badge variant={SIGNAL_BADGE[priority.urgency]}>
+                              {SIGNAL_LABEL[priority.urgency]}
+                            </Badge>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </Panel>
+                </div>
+              ) : null}
 
-          <div className="mt-5 grid grid-cols-1 gap-5 border-t border-border pt-5 md:grid-cols-2 md:gap-x-8 md:gap-y-5">
-            <Panel icon={AlertTriangle} title="Risks" count={risks.length}>
-              <ul className="space-y-2">
-                {risks.map((risk) => (
-                  <li key={risk.id} className="flex items-start gap-2.5">
-                    <span
-                      className={cn(
-                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                        SIGNAL_DOT[risk.severity],
-                      )}
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium leading-snug">{risk.title}</p>
-                      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                        {risk.impact}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
+              {hasGridCategory ? (
+                <div className="mt-5 grid grid-cols-1 gap-5 border-t border-border pt-5 md:grid-cols-2 md:gap-x-8 md:gap-y-5">
+                  {hasRisks ? (
+                    <Panel icon={AlertTriangle} title="Risks" count={risks.length}>
+                      <ul className="space-y-2">
+                        {risks.map((risk) => (
+                          <li key={risk.id} className="flex items-start gap-2.5">
+                            <span
+                              className={cn(
+                                "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                                SIGNAL_DOT[risk.severity],
+                              )}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium leading-snug">{risk.title}</p>
+                              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                                {risk.impact}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </Panel>
+                  ) : null}
 
-            <Panel icon={CalendarClock} title="Prep needed" count={meetingsToPrepare.length}>
-              <ul className="space-y-2">
-                {meetingsToPrepare.map((meeting) => (
-                  <li key={meeting.id} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 w-10 shrink-0 text-[12px] font-medium text-faint numeric">
-                      {meeting.time}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium leading-snug">{meeting.title}</p>
-                      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                        {meeting.reason}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
+                  {hasPrep ? (
+                    <Panel icon={CalendarClock} title="Prep needed" count={meetingsToPrepare.length}>
+                      <ul className="space-y-2">
+                        {meetingsToPrepare.map((meeting) => (
+                          <li key={meeting.id} className="flex items-start gap-2.5">
+                            <span className="mt-0.5 w-10 shrink-0 text-[12px] font-medium text-faint numeric">
+                              {meeting.time}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium leading-snug">{meeting.title}</p>
+                              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                                {meeting.reason}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </Panel>
+                  ) : null}
 
-            <Panel icon={Users} title="Clients" count={clientsNeedingAttention.length}>
-              <ul className="space-y-2">
-                {clientsNeedingAttention.map((client) => (
-                  <li key={client.id} className="flex items-start gap-2.5">
-                    <span
-                      className={cn(
-                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                        SIGNAL_DOT[client.severity],
-                      )}
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium leading-snug">
-                        {client.company}
-                        <span className="ml-1.5 font-normal text-muted-foreground">
-                          {client.value}
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                        {client.reason}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
+                  {hasClients ? (
+                    <Panel icon={Users} title="Clients" count={clientsNeedingAttention.length}>
+                      <ul className="space-y-2">
+                        {clientsNeedingAttention.map((client) => (
+                          <li key={client.id} className="flex items-start gap-2.5">
+                            <span
+                              className={cn(
+                                "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                                SIGNAL_DOT[client.severity],
+                              )}
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium leading-snug">
+                                {client.company}
+                                <span className="ml-1.5 font-normal text-muted-foreground">
+                                  {client.value}
+                                </span>
+                              </p>
+                              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                                {client.reason}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </Panel>
+                  ) : null}
 
-            <Panel icon={ArrowRight} title="Actions" count={recommendedActions.length}>
-              <ul className="space-y-2">
-                {recommendedActions.map((action) => (
-                  <li key={action.id} className="flex items-start gap-2.5">
-                    <span
-                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/40"
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium leading-snug">{action.label}</p>
-                      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                        {action.rationale}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          </div>
+                  {hasActions ? (
+                    <Panel icon={ArrowRight} title="Actions" count={recommendedActions.length}>
+                      <ul className="space-y-2">
+                        {recommendedActions.map((action) => (
+                          <li key={action.id} className="flex items-start gap-2.5">
+                            <span
+                              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/40"
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium leading-snug">{action.label}</p>
+                              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                                {action.rationale}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </Panel>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-1 border-t border-border px-4 py-2.5 sm:px-6">
