@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 
 const FILTERS = ["All meetings", "Needs preparation"]
 
-/** Product sections: merge tomorrow into This week; later into This month. */
+/** Product sections: tomorrow folds into This week; later stays Later. */
 const SECTION_META = [
   {
     key: "today",
@@ -40,6 +40,13 @@ const SECTION_META = [
     emphasize: false,
     defaultCollapsed: true,
   },
+  {
+    key: "later",
+    title: "Later",
+    description: "Beyond this month — synced for planning",
+    emphasize: false,
+    defaultCollapsed: true,
+  },
 ]
 
 function meetingsFromWindows(data, filterNeedsPrep) {
@@ -49,7 +56,8 @@ function meetingsFromWindows(data, filterNeedsPrep) {
     const bundled = {
       today: data.windows.today || [],
       thisWeek: [...(data.windows.tomorrow || []), ...(data.windows.thisWeek || [])],
-      thisMonth: [...(data.windows.thisMonth || []), ...(data.windows.later || [])],
+      thisMonth: data.windows.thisMonth || [],
+      later: data.windows.later || [],
     }
     return SECTION_META.map((section) => {
       let items = bundled[section.key] || []
@@ -72,7 +80,7 @@ export function MeetingsPage() {
   const { data, loading, refreshing, error, refreshError, refetch, clearRefreshError } =
     useApiQuery(getMeetings)
   const [filter, setFilter] = useState(FILTERS[0])
-  const [collapsed, setCollapsed] = useState(() => ({ thisMonth: true }))
+  const [collapsed, setCollapsed] = useState(() => ({ thisMonth: true, later: true }))
 
   const filterNeedsPrep = filter === FILTERS[1]
   const sections = useMemo(

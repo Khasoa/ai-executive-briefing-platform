@@ -155,11 +155,45 @@ def timing_display_label(
     return f"In {days} days · {date_part}"
 
 
+PREP_HORIZON_HOURS = 24
+
+
+def prep_recommended_for_meeting(
+    starts_at: datetime | None,
+    prep_status: str | None,
+    user: User | None,
+    *,
+    now: datetime | None = None,
+    hours: int = PREP_HORIZON_HOURS,
+) -> bool:
+    """Executive Meeting Prep: rolling next-``hours`` horizon (timezone-aware).
+
+    Eligible when status still needs prep and start is in ``[now, now+hours]``
+    inclusive of the far boundary. Past starts are never eligible.
+    Classification windows (today/tomorrow/later) remain separate.
+    """
+    if (prep_status or "needs-prep") != "needs-prep":
+        return False
+    if starts_at is None:
+        return False
+
+    zone = user_zone(user)
+    local_now = (now or datetime.now(timezone.utc)).astimezone(zone)
+    start_local = ensure_aware(starts_at).astimezone(zone)
+    if start_local < local_now:
+        return False
+    return start_local <= local_now + timedelta(hours=hours)
+
+
 def prep_recommended_for_window(
     window: MeetingWindow,
     prep_status: str | None,
 ) -> bool:
-    """Only today's meetings normally recommend preparation / Today's Focus."""
+    """Deprecated window-only gate — prefer :func:`prep_recommended_for_meeting`.
+
+    Kept for call sites that only know the classification window; treats only
+    ``today`` as eligible (calendar-day), which under-approximates the 24h rule.
+    """
     if window != "today":
         return False
     return (prep_status or "needs-prep") == "needs-prep"

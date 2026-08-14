@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { MeetingsPage } from "@/pages/Meetings"
 
@@ -100,6 +100,32 @@ const payload = {
       risks: [],
       sources: ["Google Calendar"],
     },
+    {
+      id: "m_later",
+      title: "Q4 Planning Offsite",
+      startTime: "09:00",
+      endTime: "17:00",
+      duration: "8h",
+      type: "internal",
+      location: "",
+      prepStatus: "needs-prep",
+      prepReason: "",
+      prepRecommended: false,
+      prepStatusLabel: "Preparation not yet needed",
+      window: "later",
+      timingLabel: "In 45 days · Sep 28",
+      weekdayDateLabel: "Monday, Sep 28",
+      isRecurring: false,
+      attendees: [],
+      agenda: [],
+      company: { name: "", industry: "", size: "", relationship: "", background: "" },
+      relatedEmails: [],
+      preparationNotes: [],
+      talkingPoints: [],
+      recommendedQuestions: [],
+      risks: [],
+      sources: ["Google Calendar"],
+    },
   ],
   windows: {
     today: null,
@@ -115,6 +141,7 @@ const payload = {
 payload.windows.today = [payload.meetings[0]]
 payload.windows.thisWeek = [payload.meetings[1]]
 payload.windows.thisMonth = [payload.meetings[2]]
+payload.windows.later = [payload.meetings[3]]
 
 afterEach(() => {
   cleanup()
@@ -146,5 +173,28 @@ describe("MeetingsPage hierarchy", () => {
 
     // No horizontal overflow utilities missing: page root clips overflow.
     expect(container.querySelector(".overflow-x-hidden")).toBeTruthy()
+  })
+
+  it("does not merge later meetings into This month", async () => {
+    getMeetings.mockResolvedValue(payload)
+    render(
+      <MemoryRouter>
+        <MeetingsPage />
+      </MemoryRouter>,
+    )
+
+    const laterHeading = await screen.findByRole("heading", { name: /Later/i })
+    fireEvent.click(laterHeading.closest("button"))
+    const monthHeading = screen.getByRole("heading", { name: /This month/i })
+    fireEvent.click(monthHeading.closest("button"))
+
+    expect(screen.getByText("Q4 Planning Offsite")).toBeInTheDocument()
+
+    const monthSection = monthHeading.closest("section")
+    expect(within(monthSection).queryByText("Q4 Planning Offsite")).toBeNull()
+    expect(within(monthSection).getByText("Monthly GHMe Content Writers Call")).toBeInTheDocument()
+
+    const laterSection = laterHeading.closest("section")
+    expect(within(laterSection).getByText("Q4 Planning Offsite")).toBeInTheDocument()
   })
 })
