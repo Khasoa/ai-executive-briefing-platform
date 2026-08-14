@@ -377,11 +377,10 @@ class OverviewService:
         if not (overdue or due_soon or high or open_items or blocked):
             return None
 
-        focus_pool = list(overdue) + [i for i in due_soon if i not in overdue]
-        for item in high + blocked + open_items:
-            if item not in focus_pool:
-                focus_pool.append(item)
-        focus_pool = focus_pool[:8]
+        # Urgency-first order; id-dedupe (separate queries = different ORM instances).
+        focus_pool = _dedupe_work_items_by_id(
+            list(overdue) + list(due_soon) + list(high) + list(blocked) + list(open_items)
+        )[:8]
 
         focus = []
         for item in focus_pool:
@@ -445,7 +444,9 @@ class OverviewService:
                 "label": item.title,
                 "rationale": _work_rationale(item),
             }
-            for item in (overdue + due_soon + high + open_items)[:5]
+            for item in _dedupe_work_items_by_id(
+                list(overdue) + list(due_soon) + list(high) + list(open_items)
+            )[:5]
         ]
 
         return {
@@ -456,6 +457,19 @@ class OverviewService:
             "kpis": kpis if len(kpis) > 1 or not is_demo_user(self.user) else demo_data.KPIS,
             "recommendedActions": recommended if recommended else self._recommended_actions(),
         }
+
+
+def _dedupe_work_items_by_id(items: list) -> list:
+    """Keep urgency-bucket order; drop later repeats of the same WorkItem.id."""
+    seen: set = set()
+    out: list = []
+    for item in items:
+        key = getattr(item, "id", None)
+        if key is None or key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
 
 
 def _work_rationale(item) -> str:
