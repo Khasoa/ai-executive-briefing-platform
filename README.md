@@ -40,6 +40,21 @@ ai-executive-partner/
 
 **Backend** — Python, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, PostgreSQL.
 
+## Quality Engineering & Testing
+
+Briefly uses automated tests to validate backend/API behaviour, frontend behaviour, mocked provider integrations and sync, authentication/OAuth, data integrity, edge cases (including timezone boundaries), and product invariants such as “recommend, never act.”
+
+**Tools:** pytest + FastAPI TestClient on the backend; Vitest, Testing Library, and jsdom on the frontend.
+
+**Suite size (current):** 295 automated tests (241 backend, 54 frontend). Run locally with `cd backend && pytest -q` and `npm run test`.
+
+High-value examples:
+- **OAuth / user isolation** — connecting one provider must not mark unrelated providers connected (backend + UI).
+- **Sync / deletion reconciliation** — ClickUp and monday.com syncs archive tasks missing from a complete remote list even when an incremental watermark exists, and skip mass-archive when pagination is incomplete (prevents stale Overview tasks).
+- **Meeting / timezone edges** — prep and “today” windows respect user timezone and midnight boundaries.
+- **Product invariants** — OpenAPI paths must not expose act-on-behalf verbs; automatic action approval cannot be enabled.
+- **Overview consistency** — the same work item cannot appear twice across Actions and Focus urgency buckets.
+
 ## Application Structure
 
 | Route | Purpose |
@@ -116,12 +131,12 @@ No page holds its own copy of server data — every view is rendered from an API
 npm run lint              # ESLint
 npm run test              # Vitest (auth + client)
 npm run build             # production bundle
-cd backend && pytest -q   # API contract and product invariants
+cd backend && pytest -q   # backend API, sync, OAuth, and product invariants
 ```
 
 Frontend lint uses **ESLint** (`eslint.config.js`) with `eslint-plugin-react`, React Hooks, and React Refresh for the Vite + JavaScript app.
 
-The backend suite covers every endpoint, both mutation paths, and the invariants that define the product: no endpoint acts on the executive's behalf, and automatic actions cannot be enabled.
+See [Quality Engineering & Testing](#quality-engineering--testing) for suite scope and examples. Notable invariants include: no endpoint acts on the executive's behalf, and automatic actions cannot be enabled.
 
 ## Design Direction
 
